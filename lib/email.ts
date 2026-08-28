@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const key = process.env.RESEND_API_KEY || "";
-const from = process.env.MAIL_FROM || "Ecopulse <noreply@welcometomorrow.io>";
+const from = process.env.MAIL_FROM || "Welcome Tomorrow Ecopulse <seo-desk@ecopulse.co.ke>";
 const resend = key ? new Resend(key) : null;
 
 export const emailEnabled = (): boolean => !!resend;
@@ -21,7 +21,7 @@ const wrap = (title: string, body: string) => `
   <div style="font-family:Outfit,Arial,sans-serif;background:#000;color:#fff;padding:32px;border-radius:20px">
     <h1 style="color:#0aa865;margin:0 0 16px">${title}</h1>
     <div style="font-size:16px;line-height:1.5;color:#fff">${body}</div>
-    <p style="color:rgba(255,255,255,.6);font-size:13px;margin-top:24px">Welcome Tomorrow Ecopulse — Link Building Marketplace</p>
+    <p style="color:rgba(255,255,255,.6);font-size:13px;margin-top:24px">Welcome Tomorrow Ecopulse - Link Building Marketplace</p>
   </div>`;
 
 export function sendInviteEmail(to: string, link: string) {

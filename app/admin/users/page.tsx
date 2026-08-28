@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { money } from "@/lib/money";
@@ -16,13 +17,19 @@ export default async function AdminUsers() {
           <tbody>
             {users.map((u) => (
               <tr key={u.id}>
-                <td className="font-semibold">{u.name}</td>
+                <td className="font-semibold">
+                  {u.role === "publisher" ? (
+                    <Link href={`/admin/users/${u.id}`} className="text-wt-green hover:underline">{u.name}</Link>
+                  ) : (
+                    u.name
+                  )}
+                </td>
                 <td className="muted">{u.email}</td>
                 <td>
                   <span className={`badge ${u.role === "admin" ? "badge-yellow" : u.role === "publisher" ? "badge-blue" : "badge-muted"}`}>{u.role}</span>
                 </td>
-                <td>{u.role === "buyer" ? money(u.balanceCents) : "—"}</td>
-                <td>{u.verified ? "✓" : "—"}</td>
+                <td>{u.role === "buyer" ? money(u.balanceCents) : "-"}</td>
+                <td>{u.verified ? "✓" : "-"}</td>
                 <td className="muted">{u.createdAt.toISOString().slice(0, 10)}</td>
               </tr>
             ))}

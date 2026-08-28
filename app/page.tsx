@@ -5,6 +5,12 @@ import ListingCard from "@/components/ListingCard";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "Link Building Marketplace",
+  description:
+    "Acquire quality backlinks and guest posts from vetted African publishers. Build your backlink profile with escrow-protected orders.",
+};
+
 export default async function HomePage() {
   const user = await getCurrentUser();
   const featured = await prisma.listing.findMany({
@@ -16,29 +22,32 @@ export default async function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="mx-auto max-w-3xl py-10 text-center md:py-16">
-        <span className="badge badge-green mb-5 inline-block">Link Building Marketplace</span>
+      <section className="mx-auto max-w-4xl py-12 text-center md:py-20">
+        <span className="badge badge-green mb-6 inline-block">Link Building Marketplace</span>
         <h1 className="h1">
-          Buy &amp; sell quality <span className="text-wt-green">backlinks</span> that actually rank
+          Build your backlink profile with <span className="text-wt-green">Welcome Tomorrow</span>
         </h1>
-        <p className="muted mx-auto mt-5 max-w-measure text-lg">
-          Order guest posts and niche edits from vetted publishers. Escrow-protected, transparent
-          pricing, paid securely by card. Publishers are invite-only, so quality stays high.
+        <p className="muted mx-auto mt-6 max-w-measure text-lg">
+          Acquire quality backlinks and guest posts from vetted African publishers. Orders
+          are escrow protected, pricing is transparent, and every placement is verified.
         </p>
-        <div className="mt-8 flex justify-center gap-3">
+        <div className="mt-9 flex flex-wrap justify-center gap-3">
           <Link href="/marketplace" className="btn-primary">Browse the marketplace</Link>
           {!user && <Link href="/register" className="btn-ghost">Create a free account</Link>}
         </div>
       </section>
 
-      {/* Featured */}
-      <section className="mt-8">
-        <div className="mb-5 flex items-end justify-between">
+      {/* Featured sites */}
+      <section className="mt-6">
+        <div className="mb-6 flex items-end justify-between">
           <h2 className="h3">Featured sites</h2>
-          <Link href="/marketplace" className="text-sm text-wt-green">View all →</Link>
+          <Link href="/marketplace" className="text-sm font-semibold text-wt-green">
+            View all
+          </Link>
         </div>
+
         {featured.length === 0 ? (
-          <div className="card muted">No listings yet. Check back soon.</div>
+          <div className="card muted">New sites are being added. Please check back soon.</div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {featured.map((l) => (
@@ -46,11 +55,20 @@ export default async function HomePage() {
             ))}
           </div>
         )}
-        {!user && (
-          <p className="muted mt-6 text-center text-sm">
-            <Link href="/login" className="text-wt-green">Sign in</Link> to see full details and place orders.
+
+        {/* Sign up CTA */}
+        <div className="mt-8 overflow-hidden rounded-lg band-green p-8 text-center text-black md:p-12">
+          <h3 className="text-2xl font-bold md:text-3xl">Ready to build your backlink profile?</h3>
+          <p className="mx-auto mt-2 max-w-xl text-black/80">
+            Create an account to acquire placements from our vetted publishers across Africa.
           </p>
-        )}
+          <Link
+            href="/register"
+            className="mt-6 inline-block rounded-pill bg-black px-8 py-3 text-[15px] font-bold uppercase tracking-[0.75px] text-white hover:bg-black/80"
+          >
+            Sign up to acquire from publishers
+          </Link>
+        </div>
       </section>
     </div>
   );

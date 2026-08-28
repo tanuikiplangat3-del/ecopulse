@@ -11,7 +11,7 @@ function q(s: string) {
   return encodeURIComponent(s);
 }
 
-/** Public registration — BUYERS ONLY. Publishers are invite-only. */
+/** Public registration - BUYERS ONLY. Publishers are invite-only. */
 export async function registerAction(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
@@ -109,15 +109,18 @@ export async function acceptInviteAction(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const password = String(formData.get("password") || "");
 
+  const sites = String(formData.get("sites") || "single");
   const invite = await prisma.invite.findUnique({ where: { token } });
   if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
     redirect(`/accept-invite?token=${q(token)}&error=${q("This invite is invalid or has expired.")}`);
   }
+  const email = (String(formData.get("email") || "") || invite!.email || "").trim().toLowerCase();
   if (!name) redirect(`/accept-invite?token=${q(token)}&error=${q("Please enter your name.")}`);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+    redirect(`/accept-invite?token=${q(token)}&error=${q("Enter a valid email address.")}`);
   if (password.length < 8)
     redirect(`/accept-invite?token=${q(token)}&error=${q("Password must be at least 8 characters.")}`);
 
-  const email = invite!.email.toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     redirect(`/login?error=${q("An account already exists for this email. Please sign in.")}`);
@@ -134,5 +137,6 @@ export async function acceptInviteAction(formData: FormData) {
   });
   await prisma.invite.update({ where: { token }, data: { acceptedAt: new Date() } });
   await createSession(user.id);
-  redirect("/dashboard");
+  // Send them straight to add their site(s), then payment details.
+  redirect(sites === "multiple" ? "/bulk-upload?first=1" : "/new-listing?first=1");
 }

@@ -2,25 +2,40 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import { Background } from "@/components/Background";
 
 const SITE = "https://tools.welcometomorrow.io";
 const PATH = "/ecopulse";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
-  title: "Welcome Tomorrow Ecopulse | Link Building Marketplace",
+  title: {
+    default: "Welcome Tomorrow Ecopulse | Link Building Marketplace",
+    template: "%s | Welcome Tomorrow Ecopulse",
+  },
   description:
-    "Buy and sell quality backlinks, guest posts and niche edits from vetted publishers. Escrow-protected orders, transparent pricing, paid securely by card.",
+    "Acquire quality backlinks and guest posts from vetted African publishers. Build your backlink profile with escrow-protected orders and transparent pricing.",
   applicationName: "Welcome Tomorrow Ecopulse",
+  keywords: [
+    "link building", "backlinks", "guest posts", "niche edits",
+    "backlink marketplace", "African publishers", "SEO", "Welcome Tomorrow",
+  ],
   alternates: { canonical: `${SITE}${PATH}` },
   icons: { icon: [{ url: `${PATH}/favicon.png` }] },
   openGraph: {
+    type: "website",
     title: "Welcome Tomorrow Ecopulse | Link Building Marketplace",
-    description: "Buy and sell quality backlinks and guest posts from vetted publishers.",
+    description:
+      "Acquire quality backlinks and guest posts from vetted African publishers. Build your backlink profile with us.",
     url: `${SITE}${PATH}`,
     siteName: "Welcome Tomorrow Ecopulse",
-    type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Welcome Tomorrow Ecopulse | Link Building Marketplace",
+    description: "Acquire quality backlinks and guest posts from vetted African publishers.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -34,9 +49,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="font-sans">
+      <body className="font-sans antialiased">
+        <Background />
         <Nav />
-        <main className="container-wt min-h-[70vh] py-10">{children}</main>
+        <main className="container-wt min-h-[70vh] py-12">{children}</main>
         <Footer />
       </body>
     </html>

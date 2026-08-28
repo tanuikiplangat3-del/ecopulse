@@ -28,8 +28,8 @@ export default function RegisterPage({ searchParams }: { searchParams: { [key: s
           </button>
         </form>
         <div className="mt-5 rounded-md border border-wt-border bg-white/5 p-3 text-xs text-white/60">
-          Want to sell placements as a <strong className="text-white/80">publisher</strong>? Publishing is
-          invite-only — ask an admin to send you an invite.
+          Want to list your sites as a <strong className="text-white/80">publisher</strong>? Publishing is
+          invite-only, so ask an admin to send you an invite.
         </div>
         <p className="muted mt-4 text-sm">
           Already have an account? <Link href="/login" className="text-wt-green">Sign in</Link>

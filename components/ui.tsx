@@ -21,7 +21,7 @@ export function Flash({ searchParams }: { searchParams?: Record<string, string |
   const sp = searchParams || {};
   const get = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const err = get("error");
-  const ok = get("success") || (get("paid") ? "Payment received — thank you!" : undefined);
+  const ok = get("success") || (get("paid") ? "Payment received - thank you!" : undefined);
   const info = get("cancelled") ? "Payment cancelled. You can try again anytime." : undefined;
   return (
     <>

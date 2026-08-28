@@ -41,8 +41,8 @@ export default async function OrderPage({
         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           <Info label="Site" value={order!.listing.domain} />
           <Info label={isPublisher ? "Your payout" : "Amount"} value={money(isPublisher ? order!.payoutCents : order!.amountCents)} />
-          <Info label="Target URL" value={order!.targetUrl || "—"} />
-          <Info label="Anchor text" value={order!.anchorText || "—"} />
+          <Info label="Target URL" value={order!.targetUrl || "-"} />
+          <Info label="Anchor text" value={order!.anchorText || "-"} />
           {order!.liveUrl && <Info label="Live URL" value={order!.liveUrl} />}
           {isAdmin && <Info label="Buyer" value={order!.buyer.name} />}
           {isAdmin && <Info label="Publisher" value={order!.listing.publisher.name} />}

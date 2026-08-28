@@ -12,8 +12,11 @@ export default async function MyListingsPage({ searchParams }: { searchParams: {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="h2">My sites</h1>
-        <Link href="/new-listing" className="btn-primary">Add a site</Link>
+        <h1 className="h2">Websites</h1>
+        <div className="flex gap-2">
+          <Link href="/bulk-upload" className="btn-ghost btn-sm">Upload sheet</Link>
+          <Link href="/new-listing" className="btn-primary btn-sm">Add a website</Link>
+        </div>
       </div>
       <Flash searchParams={searchParams} />
 

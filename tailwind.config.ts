@@ -3,7 +3,7 @@ import type { Config } from "tailwindcss";
 /**
  * Welcome Tomorrow brand design system (from welcometomorrow.io).
  * Dark theme, Outfit font, green / yellow / blue accents, glass cards.
- * NOTE: This is the official brand system — do not swap for ranktomorrow's palette.
+ * NOTE: This is the official brand system - do not swap for ranktomorrow's palette.
  */
 const config: Config = {
   content: [

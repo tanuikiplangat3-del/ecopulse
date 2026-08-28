@@ -3,6 +3,8 @@ import { acceptInviteAction } from "@/app/actions/auth";
 import { Flash } from "@/components/ui";
 import { one } from "@/lib/util";
 
+export const metadata = { title: "Publisher invite", robots: { index: false } };
+
 export default async function AcceptInvitePage({
   searchParams,
 }: {
@@ -15,7 +17,7 @@ export default async function AcceptInvitePage({
   return (
     <div className="mx-auto max-w-md">
       <div className="card">
-        <h1 className="h2 mb-1">Publisher invite</h1>
+        <h1 className="h2 mb-1">Become a publisher</h1>
         <Flash searchParams={searchParams} />
         {!valid ? (
           <p className="flash flash-error">
@@ -24,8 +26,7 @@ export default async function AcceptInvitePage({
         ) : (
           <>
             <p className="muted mb-5">
-              You&apos;ve been invited to publish on Ecopulse as{" "}
-              <strong className="text-white">{invite!.email}</strong>. Set your name and password to finish.
+              Set up your publisher account, then add the website or websites you want to list.
             </p>
             <form action={acceptInviteAction}>
               <input type="hidden" name="token" value={token} />
@@ -34,12 +35,36 @@ export default async function AcceptInvitePage({
                 <input className="input" name="name" required autoComplete="name" />
               </label>
               <label className="field">
+                <span>Email</span>
+                <input
+                  className="input"
+                  type="email"
+                  name="email"
+                  defaultValue={invite!.email || ""}
+                  required
+                  autoComplete="email"
+                />
+              </label>
+              <label className="field">
                 <span>Choose a password</span>
                 <input className="input" type="password" name="password" required minLength={8} autoComplete="new-password" />
                 <small className="muted">At least 8 characters.</small>
               </label>
+
+              <fieldset className="field">
+                <span>How many websites do you want to list?</span>
+                <div className="mt-2 grid gap-2">
+                  <label className="flex items-center gap-2 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
+                    <input type="radio" name="sites" value="single" defaultChecked /> I have one website (add it on the next step)
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
+                    <input type="radio" name="sites" value="multiple" /> I have multiple websites (upload a spreadsheet)
+                  </label>
+                </div>
+              </fieldset>
+
               <button className="btn-primary w-full" type="submit">
-                Activate my publisher account
+                Create my publisher account
               </button>
             </form>
           </>

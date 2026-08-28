@@ -5,7 +5,7 @@ WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 # ---- Build ----
 FROM node:20-slim AS builder

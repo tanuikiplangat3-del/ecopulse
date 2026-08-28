@@ -36,15 +36,17 @@ async function main() {
         passwordHash: await bcrypt.hash("demo-publisher-123", 10),
         role: "publisher",
         verified: true,
-        payoutBank: "Demo Bank — 0000000000",
+        payoutBank: "Demo Bank - 0000000000",
       },
     });
 
     const demoListings = [
-      { domain: "techdaily.example", country: "United States", category: "Technology,IT", dr: 62, traffic: 145000, price: 18000 },
-      { domain: "financewire.example", country: "United Kingdom", category: "Banking,Investment", dr: 71, traffic: 320000, price: 32000 },
-      { domain: "healthhub.example", country: "Kenya", category: "Medicine and Health", dr: 44, traffic: 52000, price: 9000 },
-      { domain: "sportsbeat.example", country: "Nigeria", category: "Sports,Gambling", dr: 55, traffic: 210000, price: 15000 },
+      { domain: "naijatech.example", country: "Nigeria", category: "Technology,IT", dr: 64, traffic: 180000, price: 20000 },
+      { domain: "kenyabiz.example", country: "Kenya", category: "Business,Finance", dr: 58, traffic: 120000, price: 16000 },
+      { domain: "sacapital.example", country: "South Africa", category: "Banking,Investment", dr: 72, traffic: 300000, price: 34000 },
+      { domain: "ghanasports.example", country: "Ghana", category: "Sports", dr: 55, traffic: 210000, price: 15000 },
+      { domain: "cairohealth.example", country: "Egypt", category: "Health", dr: 49, traffic: 90000, price: 11000 },
+      { domain: "panafrica.example", country: "Kenya", category: "News,General", dr: 61, traffic: 250000, price: 21000 },
     ];
     for (const l of demoListings) {
       await prisma.listing.create({

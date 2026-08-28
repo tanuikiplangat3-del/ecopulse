@@ -1,4 +1,4 @@
-# DEPLOY.md — Ecopulse to AWS (tools.welcometomorrow.io/ecopulse)
+# DEPLOY.md - Ecopulse to AWS (tools.welcometomorrow.io/ecopulse)
 
 Ecopulse deploys **exactly like ranktomorrow**: a Dockerised Next.js standalone app, image
 in **ECR**, run on **ECS Fargate** behind the **shared ALB**, routed by an ALB path rule.
@@ -18,7 +18,7 @@ New for ecopulse: ECR repo, target group, ALB path rule, task definition, servic
 
 ## 0. Prerequisites (once)
 - Push this project to a **public GitHub repo** with the files at the **repo root**
-  (`Dockerfile`, `next.config.js`, `package.json`, `app/`, `lib/`, `prisma/` — NOT nested
+  (`Dockerfile`, `next.config.js`, `package.json`, `app/`, `lib/`, `prisma/` - NOT nested
   in a sub-folder, NOT a committed `.zip`). Confirm after clone with
   `ls Dockerfile next.config.js package.json`.
 - Create a **PostgreSQL** database and get its connection string (`DATABASE_URL`):
@@ -119,7 +119,7 @@ aws logs create-log-group --log-group-name /ecs/ecopulse-task --region eu-west-2
 aws ecs register-task-definition --cli-input-json file://~/ecopulse-taskdef.json \
   --region eu-west-2 --query "taskDefinition.revision"
 ```
-The template carries ranktomorrow's `executionRoleArn` / `taskRoleArn` — reuse as-is.
+The template carries ranktomorrow's `executionRoleArn` / `taskRoleArn` - reuse as-is.
 
 ### F. Create the ECS service (reuse ranktomorrow's subnets + security group)
 ```bash
@@ -187,8 +187,8 @@ aws ecs update-service --cluster ranktomorrow-cluster-1 --service ecopulse-servi
 ---
 
 ## Notes
-- **Do NOT touch DNS or the certificate** — `/ecopulse` is under the same hostname the ALB
+- **Do NOT touch DNS or the certificate** - `/ecopulse` is under the same hostname the ALB
   already serves, and the ACM cert already covers it.
 - **basePath** is already `/ecopulse` in `next.config.js`, and the health route is
-  `/ecopulse/api/health` — both match the ALB rule and target-group health check.
-- Keep all secrets in the task-def env / Secrets Manager — never commit them to GitHub.
+  `/ecopulse/api/health` - both match the ALB rule and target-group health check.
+- Keep all secrets in the task-def env / Secrets Manager - never commit them to GitHub.

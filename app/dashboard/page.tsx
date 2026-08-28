@@ -3,19 +3,24 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { money } from "@/lib/money";
 import { Flash } from "@/components/ui";
-import { savePayoutAction } from "@/app/actions/listings";
 
-export default async function DashboardPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export const metadata = { title: "Dashboard" };
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const user = await requireUser();
 
   return (
     <div>
       <h1 className="h2 mb-1">Dashboard</h1>
-      <p className="muted mb-6">Signed in as {user.name} · {user.role}</p>
+      <p className="muted mb-6">Signed in as {user.name}, {user.role}</p>
       <Flash searchParams={searchParams} />
 
       {user.role === "buyer" && <BuyerDash userId={user.id} balance={user.balanceCents} />}
-      {user.role === "publisher" && <PublisherDash userId={user.id} payoutBank={user.payoutBank} />}
+      {user.role === "publisher" && <PublisherDash user={user} />}
       {user.role === "admin" && <AdminDash />}
     </div>
   );
@@ -35,27 +40,40 @@ async function BuyerDash({ userId, balance }: { userId: number; balance: number 
   );
 }
 
-async function PublisherDash({ userId, payoutBank }: { userId: number; payoutBank: string | null }) {
-  const [sites, toFulfill] = await Promise.all([
-    prisma.listing.count({ where: { publisherId: userId } }),
-    prisma.order.count({ where: { listing: { publisherId: userId }, status: "funded" } }),
+async function PublisherDash({ user }: { user: any }) {
+  const [sites, toFulfill, earnedAgg] = await Promise.all([
+    prisma.listing.count({ where: { publisherId: user.id } }),
+    prisma.order.count({ where: { listing: { publisherId: user.id }, status: "funded" } }),
+    prisma.order.aggregate({ _sum: { payoutCents: true }, where: { listing: { publisherId: user.id }, status: "completed" } }),
   ]);
+  const earned = earnedAgg._sum.payoutCents || 0;
+  const withdrawn = user.withdrawnCents || 0;
+  const available = Math.max(earned - withdrawn, 0);
+  const hasPayout = !!(user.payMethod || user.payMpesa || user.payBank || user.payPaypal);
+
   return (
-    <div className="grid gap-5 md:grid-cols-2">
-      <div className="grid gap-5">
-        <div className="card"><p className="muted text-sm">My sites</p><p className="text-3xl font-bold">{sites}</p><div className="mt-4 flex gap-2"><Link href="/my-listings" className="btn-ghost btn-sm">Manage</Link><Link href="/new-listing" className="btn-primary btn-sm">Add a site</Link></div></div>
-        <div className="card"><p className="muted text-sm">Orders to fulfil</p><p className="text-3xl font-bold">{toFulfill}</p><Link href="/orders" className="btn-ghost btn-sm mt-4">View orders</Link></div>
+    <div>
+      <div className="mb-5 flash flash-info">
+        All payments for all orders are paid weekly on Tuesday. Any payment not received by
+        then, contact seo@welcometomorrow.io immediately to be resolved.
       </div>
-      <div className="card">
-        <h2 className="h3 mb-2">Payout details</h2>
-        <p className="muted mb-4 text-sm">Where should the admin send your earnings? (Bank or PayPal)</p>
-        <form action={savePayoutAction}>
-          <label className="field">
-            <span>Payout account</span>
-            <input className="input" name="payoutBank" defaultValue={payoutBank || ""} placeholder="Bank name + account, or PayPal email" />
-          </label>
-          <button className="btn-primary btn-sm" type="submit">Save</button>
-        </form>
+
+      {!hasPayout && (
+        <div className="card mb-5 flex flex-wrap items-center justify-between gap-3 border-wt-yellow/40 bg-wt-yellow/10">
+          <span className="text-sm">Add your payment details so we can pay your earnings.</span>
+          <Link href="/payout" className="btn-accent btn-sm">Add payment details</Link>
+        </div>
+      )}
+
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="card"><p className="muted text-sm">Available balance</p><p className="text-3xl font-bold text-wt-green">{money(available)}</p><Link href="/payout" className="btn-ghost btn-sm mt-4">Payment details</Link></div>
+        <div className="card"><p className="muted text-sm">Total received</p><p className="text-3xl font-bold">{money(withdrawn)}</p></div>
+        <div className="card"><p className="muted text-sm">Total earned</p><p className="text-3xl font-bold">{money(earned)}</p></div>
+      </div>
+
+      <div className="mt-5 grid gap-5 md:grid-cols-2">
+        <div className="card"><p className="muted text-sm">Your websites</p><p className="text-3xl font-bold">{sites}</p><div className="mt-4 flex gap-2"><Link href="/my-listings" className="btn-ghost btn-sm">Manage</Link><Link href="/new-listing" className="btn-primary btn-sm">Add a website</Link></div></div>
+        <div className="card"><p className="muted text-sm">Orders to fulfil</p><p className="text-3xl font-bold">{toFulfill}</p><Link href="/orders" className="btn-ghost btn-sm mt-4">View orders</Link></div>
       </div>
     </div>
   );

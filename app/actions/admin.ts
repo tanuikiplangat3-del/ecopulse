@@ -29,8 +29,19 @@ export async function invitePublisherAction(formData: FormData) {
     await sendInviteEmail(email, link);
     redirect(`/admin/invites?success=${q("Invite sent to " + email)}`);
   }
-  // Email off — show the link so the admin can share it manually.
+  // Email off - show the link so the admin can share it manually.
   redirect(`/admin/invites?success=${q("Invite created. Share this link: " + link)}`);
+}
+
+/** Create a shareable publisher invite link (not tied to a specific email). */
+export async function createShareInviteAction() {
+  await requireRole("admin");
+  const token = randomBytes(24).toString("hex");
+  await prisma.invite.create({
+    data: { email: null, token, role: "publisher", expiresAt: new Date(Date.now() + 7 * 86400_000) },
+  });
+  const link = `${appUrl()}/accept-invite?token=${token}`;
+  redirect(`/admin/invites?success=${q("Shareable invite link created. Send it to your publisher: " + link)}`);
 }
 
 export async function revokeInviteAction(formData: FormData) {

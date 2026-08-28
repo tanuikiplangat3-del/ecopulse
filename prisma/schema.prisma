@@ -1,4 +1,4 @@
-// Welcome Tomorrow Ecopulse — data model (ported from the reference PHP app).
+// Welcome Tomorrow Ecopulse - data model (ported from the reference PHP app).
 // Money is stored as integer USD cents everywhere.
 //
 // LOCAL DEV uses SQLite (works with zero setup).
@@ -12,20 +12,27 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         String   @default("buyer") // buyer | publisher | admin
-  balanceCents Int      @default(0)
-  payoutBank   String?  // free-text bank / PayPal payout note
-  verified     Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  role           String   @default("buyer") // buyer | publisher | admin
+  balanceCents   Int      @default(0)   // buyer wallet
+  withdrawnCents Int      @default(0)   // publisher: total already paid out
+  payoutBank     String?  // legacy free-text payout note
+  payMethod      String?  // bank | paypal | mpesa | card
+  payCountry     String?
+  payBank        String?  // bank name + account
+  payPaypal      String?  // PayPal email
+  payMpesa       String?  // M-Pesa phone
+  payCard        String?  // card / other note
+  verified       Boolean  @default(false)
+  createdAt      DateTime @default(now())
 
   listings  Listing[]
   orders    Order[]    @relation("BuyerOrders")
@@ -108,7 +115,7 @@ model StripeTx {
 
 model Invite {
   id         Int       @id @default(autoincrement())
-  email      String
+  email      String?
   token      String    @unique
   role       String    @default("publisher")
   expiresAt  DateTime
