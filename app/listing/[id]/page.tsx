@@ -1,0 +1,97 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+import { money, buyerPrice, trafficShort } from "@/lib/money";
+import { linkTypeLabel } from "@/lib/data";
+import { placeOrderAction } from "@/app/actions/orders";
+import { Flash } from "@/components/ui";
+
+export default async function ListingPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
+  const id = parseInt(params.id);
+  const listing = await prisma.listing.findUnique({ where: { id } });
+  if (!listing || listing.status !== "approved") notFound();
+  const user = await getCurrentUser();
+  const niches = listing.category.split(",").filter(Boolean);
+
+  return (
+    <div className="grid gap-8 lg:grid-cols-3">
+      {/* Details */}
+      <div className="lg:col-span-2">
+        <Link href="/marketplace" className="muted text-sm">← Back to marketplace</Link>
+        <h1 className="h2 mb-1 mt-2">{listing.domain}</h1>
+        <p className="muted mb-5">{listing.country} · {listing.language}</p>
+
+        <div className="card mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div><p className="muted text-xs">Domain Rating</p><p className="text-xl font-bold">{listing.domainRating}</p></div>
+          <div><p className="muted text-xs">Monthly Traffic</p><p className="text-xl font-bold">{trafficShort(listing.monthlyTraffic)}</p></div>
+          <div><p className="muted text-xs">Turnaround</p><p className="text-xl font-bold">{listing.tatDays}d</p></div>
+          <div><p className="muted text-xs">Type</p><p className="text-lg font-bold">{linkTypeLabel(listing.linkType)}</p></div>
+        </div>
+
+        {niches.length > 0 && (
+          <div className="mb-5 flex flex-wrap gap-2">
+            {niches.map((n) => (<span key={n} className="badge badge-muted">{n}</span>))}
+          </div>
+        )}
+
+        {listing.description && (
+          <div className="card">
+            <h2 className="h3 mb-2">About this placement</h2>
+            <p className="text-white/80">{listing.description}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Order box */}
+      <div>
+        <div className="card sticky top-20">
+          <p className="muted text-sm">Price</p>
+          <p className="mb-4 text-3xl font-bold text-wt-green">{money(buyerPrice(listing.priceCents))}</p>
+          <Flash searchParams={searchParams} />
+
+          {!user && (
+            <>
+              <p className="muted mb-4 text-sm">Sign in as a buyer to place an order.</p>
+              <Link href="/login" className="btn-primary w-full">Sign in to order</Link>
+            </>
+          )}
+
+          {user && user.role === "buyer" && (
+            <form action={placeOrderAction}>
+              <input type="hidden" name="listingId" value={listing.id} />
+              <label className="field">
+                <span>Your target URL</span>
+                <input className="input" name="targetUrl" placeholder="https://yoursite.com/page" required />
+              </label>
+              <label className="field">
+                <span>Anchor text</span>
+                <input className="input" name="anchorText" placeholder="e.g. best running shoes" required />
+              </label>
+              <label className="field">
+                <span>Article / instructions (optional)</span>
+                <textarea className="textarea" name="articleContent" placeholder="Paste your article or leave instructions for the publisher" />
+              </label>
+              <label className="field">
+                <span>Notes (optional)</span>
+                <input className="input" name="notes" placeholder="Anything else" />
+              </label>
+              <button className="btn-primary w-full" type="submit">Place order</button>
+              <p className="muted mt-3 text-center text-xs">You&apos;ll pay on the next step. Funds are held until the link is live.</p>
+            </form>
+          )}
+
+          {user && user.role !== "buyer" && (
+            <p className="muted text-sm">Only buyer accounts can place orders.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

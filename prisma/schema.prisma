@@ -1,0 +1,146 @@
+// Welcome Tomorrow Ecopulse — data model (ported from the reference PHP app).
+// Money is stored as integer USD cents everywhere.
+//
+// LOCAL DEV uses SQLite (works with zero setup).
+// PRODUCTION: change `provider` to "postgresql" and set DATABASE_URL to your
+// Postgres connection string (Neon / Supabase / AWS RDS), then run
+// `npx prisma migrate deploy`. Enums are modelled as strings so the schema is
+// portable between SQLite and Postgres without changes.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("buyer") // buyer | publisher | admin
+  balanceCents Int      @default(0)
+  payoutBank   String?  // free-text bank / PayPal payout note
+  verified     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  listings  Listing[]
+  orders    Order[]    @relation("BuyerOrders")
+  walletTx  WalletTx[]
+}
+
+model Listing {
+  id             Int      @id @default(autoincrement())
+  publisherId    Int
+  publisher      User     @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  domain         String
+  url            String
+  category       String   // comma-separated niches
+  country        String
+  language       String   @default("English")
+  domainRating   Int      @default(0)
+  monthlyTraffic Int      @default(0)
+  linkType       String   @default("guest_post") // guest_post | niche_edit
+  priceCents     Int      @default(0) // publisher's price (what they receive), in cents
+  tatDays        Int      @default(7)
+  description    String?
+  status         String   @default("pending") // pending | approved | rejected
+  createdAt      DateTime @default(now())
+
+  orders Order[]
+
+  @@index([status])
+  @@index([publisherId])
+}
+
+model Order {
+  id             Int      @id @default(autoincrement())
+  buyerId        Int
+  buyer          User     @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  listingId      Int
+  listing        Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  targetUrl      String?
+  anchorText     String?
+  notes          String?
+  articleContent String?  // pasted guest-post content (MVP; file upload = future)
+  featuredImage  String?  // optional image URL
+  liveUrl        String?
+  amountCents    Int      @default(0) // what the buyer pays
+  payoutCents    Int      @default(0) // what the publisher receives
+  commissionRate String   @default("0")
+  status         String   @default("pending_payment") // pending_payment | funded | live | completed | cancelled
+  publisherPaid  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([buyerId])
+  @@index([listingId])
+  @@index([status])
+}
+
+model WalletTx {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       String   // topup | spend | refund
+  amountCents Int
+  method     String?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model StripeTx {
+  id         Int      @id @default(autoincrement())
+  ref        String   @unique
+  userId     Int
+  purpose    String   // order | topup
+  orderId    Int      @default(0)
+  amountCents Int
+  status     String   @default("pending") // pending | success | failed
+  providerId String?
+  createdAt  DateTime @default(now())
+}
+
+model Invite {
+  id         Int       @id @default(autoincrement())
+  email      String
+  token      String    @unique
+  role       String    @default("publisher")
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+}
+
+model SiteRequest {
+  id        Int      @id @default(autoincrement())
+  buyerId   Int
+  urls      String?
+  status    String   @default("open") // open | closed
+  adminNote String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PasswordReset {
+  token     String   @id
+  userId    Int
+  expiresAt DateTime
+}
+
+model EmailVerification {
+  token     String   @id
+  userId    Int
+  expiresAt DateTime
+}
+
+model Setting {
+  key   String @id
+  value String?
+}
