@@ -9,10 +9,9 @@ export default async function Nav() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/70 backdrop-blur">
       <div className="container-wt flex h-20 items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-3" aria-label="Welcome Tomorrow Ecopulse home">
+        <Link href="/" className="flex items-center" aria-label="Welcome Tomorrow home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={LOGO} alt="Welcome Tomorrow" className="h-8 w-auto" />
-          <span className="hidden text-sm font-bold text-wt-green sm:inline">Ecopulse</span>
         </Link>
 
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm font-semibold">
