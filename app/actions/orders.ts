@@ -11,6 +11,20 @@ import { emailEnabled, sendOrderNotice } from "@/lib/email";
 
 const q = (s: string) => encodeURIComponent(s);
 
+/** Read an uploaded file into a data URL, capped at maxBytes. Returns "too_big" if over. */
+async function readUpload(
+  entry: FormDataEntryValue | null,
+  maxBytes: number
+): Promise<{ url: string; name: string } | "too_big" | null> {
+  if (!entry || typeof entry === "string") return null;
+  const file = entry as File;
+  if (!file || file.size === 0) return null;
+  if (file.size > maxBytes) return "too_big";
+  const buf = Buffer.from(await file.arrayBuffer());
+  const mime = file.type || "application/octet-stream";
+  return { url: `data:${mime};base64,${buf.toString("base64")}`, name: file.name };
+}
+
 export async function placeOrderAction(formData: FormData) {
   const user = await requireRole("buyer");
   const listingId = parseInt(String(formData.get("listingId") || "0"));
@@ -18,6 +32,16 @@ export async function placeOrderAction(formData: FormData) {
   if (!listing || listing.status !== "approved") {
     redirect(`/marketplace?error=${q("That listing is not available.")}`);
   }
+
+  // Turnaround: only 5, 7 or 10 days are offered.
+  let tat = parseInt(String(formData.get("turnaroundDays") || "7"));
+  if (![5, 7, 10].includes(tat)) tat = 7;
+
+  // Optional uploads (image up to 4MB, document up to 6MB), stored as data URLs.
+  const doc = await readUpload(formData.get("articleDoc"), 6 * 1024 * 1024);
+  if (doc === "too_big") redirect(`/listing/${listingId}?error=${q("Your document is larger than 6MB. Please upload a smaller file.")}`);
+  const img = await readUpload(formData.get("featuredImageFile"), 4 * 1024 * 1024);
+  if (img === "too_big") redirect(`/listing/${listingId}?error=${q("Your image is larger than 4MB. Please upload a smaller image.")}`);
 
   const amount = buyerPrice(listing!.priceCents);
   const order = await prisma.order.create({
@@ -28,7 +52,10 @@ export async function placeOrderAction(formData: FormData) {
       anchorText: String(formData.get("anchorText") || "").trim(),
       notes: String(formData.get("notes") || "").trim(),
       articleContent: String(formData.get("articleContent") || "").trim(),
-      featuredImage: String(formData.get("featuredImage") || "").trim(),
+      featuredImage: img ? img.url : String(formData.get("featuredImage") || "").trim(),
+      articleDocName: doc ? doc.name : null,
+      articleDocUrl: doc ? doc.url : null,
+      turnaroundDays: tat,
       amountCents: amount,
       payoutCents: listing!.priceCents,
       commissionRate: String(commissionRate()),

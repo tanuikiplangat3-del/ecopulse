@@ -9,6 +9,10 @@ const nextConfig = {
     unoptimized: true,
     remotePatterns: [{ protocol: "https", hostname: "**" }],
   },
+  // Allow buyers to upload a featured image + guest-post document with an order.
+  experimental: {
+    serverActions: { bodySizeLimit: "12mb" },
+  },
   // Keep the deploy pipeline resilient for non-developer redeploys.
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },

@@ -43,10 +43,31 @@ export default async function OrderPage({
           <Info label={isPublisher ? "Your payout" : "Amount"} value={money(isPublisher ? order!.payoutCents : order!.amountCents)} />
           <Info label="Target URL" value={order!.targetUrl || "-"} />
           <Info label="Anchor text" value={order!.anchorText || "-"} />
+          <Info label="Turnaround" value={`${order!.turnaroundDays} days`} />
           {order!.liveUrl && <Info label="Live URL" value={order!.liveUrl} />}
           {isAdmin && <Info label="Buyer" value={order!.buyer.name} />}
           {isAdmin && <Info label="Publisher" value={order!.listing.publisher.name} />}
         </dl>
+
+        {(order!.articleDocUrl || order!.featuredImage) && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            {order!.articleDocUrl && (
+              <a
+                href={order!.articleDocUrl}
+                download={order!.articleDocName || "guest-post-document"}
+                className="btn-ghost btn-sm"
+              >
+                ⬇ Download document{order!.articleDocName ? ` (${order!.articleDocName})` : ""}
+              </a>
+            )}
+            {order!.featuredImage && (
+              <a href={order!.featuredImage} download="featured-image" className="btn-ghost btn-sm">
+                ⬇ Download featured image
+              </a>
+            )}
+          </div>
+        )}
+
         {order!.articleContent && (
           <div className="mt-4">
             <p className="muted text-xs">Article / instructions</p>

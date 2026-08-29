@@ -7,7 +7,7 @@ const LOGO = "https://welcometomorrow.io/wp-content/uploads/2025/07/WT-logo-whit
 export default async function Nav() {
   const u = await getCurrentUser();
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-black/70 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-white/5 bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px]">
       <div className="container-wt flex h-20 items-center justify-between gap-4">
         <Link href="/" className="flex items-center" aria-label="Welcome Tomorrow home">
           {/* eslint-disable-next-line @next/next/no-img-element */}

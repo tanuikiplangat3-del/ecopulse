@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import ListingCard from "@/components/ListingCard";
-import UndergroundSelect from "@/components/UndergroundSelect";
+import SearchSelect from "@/components/SearchSelect";
 import { Flash } from "@/components/ui";
 import { NICHES, COUNTRIES, LANGUAGES } from "@/lib/data";
 import { centsFromUsd } from "@/lib/money";
@@ -63,15 +63,15 @@ export default async function MarketplacePage({
           </label>
           <div className="field mb-0">
             <span>Country</span>
-            <UndergroundSelect name="country" options={COUNTRIES} coreCount={5} defaultValue={country} />
+            <SearchSelect name="country" options={COUNTRIES} defaultValue={country} title="Filter by country" />
           </div>
           <div className="field mb-0">
             <span>Language</span>
-            <UndergroundSelect name="language" options={LANGUAGES} coreCount={5} defaultValue={language} />
+            <SearchSelect name="language" options={LANGUAGES} defaultValue={language} title="Filter by language" />
           </div>
           <div className="field mb-0">
             <span>Niche</span>
-            <UndergroundSelect name="niche" options={NICHES} coreCount={5} defaultValue={niche} />
+            <SearchSelect name="niche" options={NICHES} defaultValue={niche} title="Filter by niche" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="field mb-0">

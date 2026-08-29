@@ -64,7 +64,7 @@ export default async function ListingPage({
           )}
 
           {user && user.role === "buyer" && (
-            <form action={placeOrderAction}>
+            <form action={placeOrderAction} encType="multipart/form-data">
               <input type="hidden" name="listingId" value={listing.id} />
               <label className="field">
                 <span>Your target URL</span>
@@ -75,7 +75,33 @@ export default async function ListingPage({
                 <input className="input" name="anchorText" placeholder="e.g. best running shoes" required />
               </label>
               <label className="field">
-                <span>Article / instructions (optional)</span>
+                <span>Turnaround</span>
+                <select className="select" name="turnaroundDays" defaultValue="7">
+                  <option value="5">5 days</option>
+                  <option value="7">7 days</option>
+                  <option value="10">10 days</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Guest post document (Word / PDF)</span>
+                <input
+                  className="input file:mr-3 file:rounded-pill file:border-0 file:bg-wt-green file:px-4 file:py-1.5 file:text-white"
+                  type="file"
+                  name="articleDoc"
+                  accept=".doc,.docx,.pdf,.txt,.rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                />
+              </label>
+              <label className="field">
+                <span>Featured image (optional)</span>
+                <input
+                  className="input file:mr-3 file:rounded-pill file:border-0 file:bg-wt-green file:px-4 file:py-1.5 file:text-white"
+                  type="file"
+                  name="featuredImageFile"
+                  accept="image/*"
+                />
+              </label>
+              <label className="field">
+                <span>Article text / instructions (optional)</span>
                 <textarea className="textarea" name="articleContent" placeholder="Paste your article or leave instructions for the publisher" />
               </label>
               <label className="field">

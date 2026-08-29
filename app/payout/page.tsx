@@ -2,7 +2,7 @@ import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { savePayoutAction } from "@/app/actions/listings";
 import { Flash } from "@/components/ui";
-import UndergroundSelect from "@/components/UndergroundSelect";
+import SearchSelect from "@/components/SearchSelect";
 import { COUNTRIES } from "@/lib/data";
 import { one } from "@/lib/util";
 
@@ -41,7 +41,7 @@ export default async function PayoutPage({
         </label>
         <div className="field">
           <span>Country</span>
-          <UndergroundSelect name="payCountry" options={COUNTRIES} coreCount={5} selectableAll defaultValue={me?.payCountry || ""} placeholder="Choose" />
+          <SearchSelect name="payCountry" options={COUNTRIES} defaultValue={me?.payCountry || ""} placeholder="Choose" title="Choose your country" />
         </div>
         <label className="field">
           <span>M-Pesa phone number</span>

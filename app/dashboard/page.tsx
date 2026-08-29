@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { money } from "@/lib/money";
-import { Flash } from "@/components/ui";
+import { Flash, StatusBadge } from "@/components/ui";
 
 export const metadata = { title: "Dashboard" };
 
@@ -27,15 +27,57 @@ export default async function DashboardPage({
 }
 
 async function BuyerDash({ userId, balance }: { userId: number; balance: number }) {
-  const [orders, active] = await Promise.all([
+  const [total, pending, live, recent] = await Promise.all([
     prisma.order.count({ where: { buyerId: userId } }),
-    prisma.order.count({ where: { buyerId: userId, status: { in: ["pending_payment", "funded", "live"] } } }),
+    prisma.order.count({ where: { buyerId: userId, status: { in: ["pending_payment", "funded"] } } }),
+    prisma.order.count({ where: { buyerId: userId, status: { in: ["live", "completed"] } } }),
+    prisma.order.findMany({
+      where: { buyerId: userId },
+      include: { listing: true },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
   ]);
+
   return (
-    <div className="grid gap-5 md:grid-cols-3">
-      <div className="card"><p className="muted text-sm">Wallet balance</p><p className="text-3xl font-bold text-wt-green">{money(balance)}</p><Link href="/topup" className="btn-ghost btn-sm mt-4">Top up</Link></div>
-      <div className="card"><p className="muted text-sm">Total orders</p><p className="text-3xl font-bold">{orders}</p><Link href="/orders" className="btn-ghost btn-sm mt-4">View orders</Link></div>
-      <div className="card"><p className="muted text-sm">Active orders</p><p className="text-3xl font-bold">{active}</p><Link href="/marketplace" className="btn-primary btn-sm mt-4">Browse sites</Link></div>
+    <div>
+      <div className="grid gap-5 md:grid-cols-4">
+        <div className="card"><p className="muted text-sm">Wallet balance</p><p className="text-3xl font-bold text-wt-green">{money(balance)}</p><Link href="/topup" className="btn-ghost btn-sm mt-4">Top up</Link></div>
+        <div className="card"><p className="muted text-sm">Orders placed</p><p className="text-3xl font-bold">{total}</p><Link href="/orders" className="btn-ghost btn-sm mt-4">View all</Link></div>
+        <div className="card"><p className="muted text-sm">Pending</p><p className="text-3xl font-bold text-wt-yellow">{pending}</p></div>
+        <div className="card"><p className="muted text-sm">Live links</p><p className="text-3xl font-bold text-[#8ea0ff]">{live}</p><Link href="/marketplace" className="btn-primary btn-sm mt-4">Browse sites</Link></div>
+      </div>
+
+      <h2 className="h3 mb-3 mt-8">Your orders</h2>
+      {recent.length === 0 ? (
+        <div className="card muted">You have not placed any orders yet. <Link href="/marketplace" className="text-wt-green">Browse the marketplace</Link>.</div>
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="table-wt">
+            <thead>
+              <tr><th>#</th><th>Site</th><th>Amount</th><th>Status</th><th>Live URL</th><th></th></tr>
+            </thead>
+            <tbody>
+              {recent.map((o) => (
+                <tr key={o.id}>
+                  <td>{o.id}</td>
+                  <td className="font-semibold">{o.listing.domain}</td>
+                  <td>{money(o.amountCents)}</td>
+                  <td><StatusBadge status={o.status} /></td>
+                  <td>
+                    {o.liveUrl ? (
+                      <a href={o.liveUrl} target="_blank" rel="noopener noreferrer" className="text-wt-green break-all hover:underline">{o.liveUrl}</a>
+                    ) : (
+                      <span className="muted">-</span>
+                    )}
+                  </td>
+                  <td><Link href={`/orders/${o.id}`} className="text-wt-green whitespace-nowrap">Open →</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

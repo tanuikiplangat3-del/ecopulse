@@ -2,7 +2,7 @@ import { requireRole } from "@/lib/auth";
 import { NICHES, COUNTRIES, LANGUAGES, LINK_TYPES } from "@/lib/data";
 import { createListingAction } from "@/app/actions/listings";
 import { Flash } from "@/components/ui";
-import UndergroundSelect from "@/components/UndergroundSelect";
+import SearchSelect from "@/components/SearchSelect";
 import { one } from "@/lib/util";
 
 export const metadata = { title: "Add a website" };
@@ -37,11 +37,11 @@ export default async function NewListingPage({
           </label>
           <div className="field mb-0">
             <span>Country</span>
-            <UndergroundSelect name="country" options={COUNTRIES} coreCount={5} selectableAll placeholder="Choose" />
+            <SearchSelect name="country" options={COUNTRIES} placeholder="Choose" title="Choose a country" allowAny={false} />
           </div>
           <div className="field mb-0">
             <span>Language</span>
-            <UndergroundSelect name="language" options={LANGUAGES} coreCount={5} selectableAll defaultValue="English" />
+            <SearchSelect name="language" options={LANGUAGES} defaultValue="English" title="Choose a language" allowAny={false} />
           </div>
           <label className="field mb-0">
             <span>Link type</span>

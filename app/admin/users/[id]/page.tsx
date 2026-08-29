@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { money, trafficShort } from "@/lib/money";
 import { StatusBadge } from "@/components/ui";
+import { deleteUserAction } from "@/app/actions/admin";
 
 export const metadata = { title: "Publisher" };
 
@@ -22,8 +23,16 @@ export default async function AdminPublisherPage({ params }: { params: { id: str
   return (
     <div>
       <Link href="/admin/users" className="muted text-sm">← All users</Link>
-      <h1 className="h2 mb-1 mt-2">{pub.name}</h1>
-      <p className="muted mb-6">{pub.email} · {pub.role}</p>
+      <div className="mb-6 mt-2 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="h2 mb-1">{pub.name}</h1>
+          <p className="muted">{pub.email} · {pub.role}</p>
+        </div>
+        <form action={deleteUserAction}>
+          <input type="hidden" name="id" value={pub.id} />
+          <button type="submit" className="btn-danger btn-sm">Delete this user</button>
+        </form>
+      </div>
 
       <div className="mb-6 grid gap-5 sm:grid-cols-3">
         <div className="card"><p className="muted text-sm">Websites</p><p className="text-3xl font-bold">{listings.length}</p></div>

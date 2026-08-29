@@ -76,6 +76,19 @@ export async function approveAllListingsAction() {
   redirect(`/admin/listings?success=${q("All pending listings approved.")}`);
 }
 
+/** Super admin: permanently delete any user (and their sites/orders via cascade). */
+export async function deleteUserAction(formData: FormData) {
+  const me = await requireRole("admin");
+  const id = parseInt(String(formData.get("id") || "0"));
+  if (id === me.id) redirect(`/admin/users?error=${q("You cannot delete your own account.")}`);
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) redirect(`/admin/users?error=${q("User not found.")}`);
+  await prisma.user.delete({ where: { id } });
+  revalidatePath("/admin/users");
+  revalidatePath("/marketplace");
+  redirect(`/admin/users?success=${q("Deleted " + target!.email + ".")}`);
+}
+
 export async function markPublisherPaidAction(formData: FormData) {
   await requireRole("admin");
   const orderId = parseInt(String(formData.get("orderId") || "0"));

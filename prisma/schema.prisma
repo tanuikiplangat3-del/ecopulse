@@ -72,8 +72,11 @@ model Order {
   targetUrl      String?
   anchorText     String?
   notes          String?
-  articleContent String?  // pasted guest-post content (MVP; file upload = future)
-  featuredImage  String?  // optional image URL
+  articleContent String?  // pasted guest-post content / instructions
+  featuredImage  String?  // uploaded featured image (data URL) or link
+  articleDocName String?  // uploaded guest-post document filename
+  articleDocUrl  String?  // uploaded guest-post document (data URL)
+  turnaroundDays Int      @default(7) // buyer-selected turnaround: 5 | 7 | 10
   liveUrl        String?
   amountCents    Int      @default(0) // what the buyer pays
   payoutCents    Int      @default(0) // what the publisher receives

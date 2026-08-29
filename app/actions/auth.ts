@@ -41,8 +41,16 @@ export async function registerAction(formData: FormData) {
     await prisma.emailVerification.create({
       data: { token, userId: user.id, expiresAt: new Date(Date.now() + 86400_000) },
     });
-    await sendVerificationEmail(email, `${appUrl()}/verify-email?token=${token}`);
-    redirect(`/login?success=${q("Check your email for a verification link, then sign in.")}`);
+    const sent = await sendVerificationEmail(email, `${appUrl()}/verify-email?token=${token}`);
+    if (sent) {
+      redirect(`/login?success=${q("Check your email for a verification link, then sign in.")}`);
+    }
+    // The email could not be delivered (e.g. the sending domain isn't verified in
+    // Resend yet). Never strand the buyer: activate the account and sign them in.
+    await prisma.user.update({ where: { id: user.id }, data: { verified: true } });
+    await prisma.emailVerification.deleteMany({ where: { userId: user.id } });
+    await createSession(user.id);
+    redirect(`/dashboard?success=${q("Welcome! Your account is ready.")}`);
   }
 
   await createSession(user.id);
