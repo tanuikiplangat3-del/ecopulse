@@ -3,6 +3,7 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import { Background } from "@/components/Background";
+import ChatWidget from "@/components/ChatWidget";
 
 const SITE = "https://tools.welcometomorrow.io";
 const PATH = "/ecopulse";
@@ -21,7 +22,6 @@ export const metadata: Metadata = {
     "backlink marketplace", "African publishers", "SEO", "Welcome Tomorrow",
   ],
   alternates: { canonical: `${SITE}${PATH}` },
-  icons: { icon: [{ url: `${PATH}/favicon.png` }] },
   openGraph: {
     type: "website",
     title: "Welcome Tomorrow Ecopulse | Link Building Marketplace",
@@ -54,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Nav />
         <main className="container-wt min-h-[70vh] py-12">{children}</main>
         <Footer />
+        <ChatWidget />
       </body>
     </html>
   );

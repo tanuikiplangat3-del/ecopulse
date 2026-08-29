@@ -6,15 +6,40 @@ const resend = key ? new Resend(key) : null;
 
 export const emailEnabled = (): boolean => !!resend;
 
-async function send(to: string, subject: string, html: string): Promise<boolean> {
+async function send(to: string, subject: string, html: string, replyTo?: string): Promise<boolean> {
   if (!resend) return false;
   try {
-    await resend.emails.send({ from, to, subject, html });
+    await resend.emails.send({ from, to, subject, html, replyTo });
     return true;
   } catch (e) {
     console.error("Email send failed:", e);
     return false;
   }
+}
+
+/** Escape user-supplied text before putting it in an HTML email. */
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+}
+
+/** Chat / contact form -> the SEO desk inbox, with the visitor set as reply-to. */
+export function sendContactEmail(input: { name: string; email: string; message: string }) {
+  return send(
+    "seo@welcometomorrow.io",
+    `New chat message from ${input.name}`,
+    wrap(
+      "New message from the Ecopulse chat",
+      `<p><strong>Name:</strong> ${esc(input.name)}</p>
+       <p><strong>Email:</strong> ${esc(input.email)}</p>
+       <p><strong>Message:</strong></p>
+       <p>${esc(input.message)}</p>`
+    ),
+    input.email
+  );
 }
 
 const wrap = (title: string, body: string) => `

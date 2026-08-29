@@ -92,8 +92,9 @@ export default function SearchSelect({
           className="fixed inset-0 z-[9999] flex items-start justify-center p-4 pt-[12vh]"
           onMouseDown={() => setOpen(false)}
         >
-          {/* backdrop - solid so nothing behind is visible or clickable */}
-          <div className="absolute inset-0 bg-black/95" />
+          {/* backdrop - translucent: the page shows through, dimmed and blurred,
+              but can't be scrolled or clicked until a choice is made */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
           {/* popup */}
           <div
