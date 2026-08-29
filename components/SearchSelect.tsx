@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   name: string;
@@ -33,7 +34,21 @@ export default function SearchSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [value, setValue] = useState(defaultValue);
+  const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => setMounted(true), []);
+
+  // Prevent the page from scrolling behind the open popup.
+  useEffect(() => {
+    if (open) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -72,9 +87,9 @@ export default function SearchSelect({
         <span className="text-white/50">▾</span>
       </button>
 
-      {open && (
+      {open && mounted && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-[12vh]"
+          className="fixed inset-0 z-[9999] flex items-start justify-center p-4 pt-[12vh]"
           onMouseDown={() => setOpen(false)}
         >
           {/* backdrop */}
@@ -135,7 +150,8 @@ export default function SearchSelect({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
