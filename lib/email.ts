@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { money } from "./money";
 
 const key = process.env.RESEND_API_KEY || "";
 const from = process.env.MAIL_FROM || "Welcome Tomorrow <seo@welcometomorrow.io>";
@@ -79,6 +80,20 @@ export function sendVerificationEmail(to: string, link: string) {
 
 export function sendOrderNotice(to: string, subject: string, message: string) {
   return send(to, subject, wrap(subject, `<p>${message}</p>`));
+}
+
+/** Deposit succeeded -> confirm to the buyer and promise an invoice within 24h. */
+export function sendDepositReceipt(to: string, grossCents: number, netCents: number) {
+  return send(
+    to,
+    "Your deposit was successful",
+    wrap(
+      "Deposit received",
+      `<p>We have received your deposit of <strong>${money(grossCents)}</strong>.</p>
+       <p>After the 5% service fee, <strong>${money(netCents)}</strong> has been added to your wallet balance and is ready to use.</p>
+       <p>Your invoice will be emailed to you within 24 hours.</p>`
+    )
+  );
 }
 
 /** New paid order -> notify the publisher AND the admin desk so both can act. */

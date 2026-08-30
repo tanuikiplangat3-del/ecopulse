@@ -130,7 +130,14 @@ export async function markPublisherPaidAction(formData: FormData) {
   await requireRole("admin");
   const orderId = parseInt(String(formData.get("orderId") || "0"));
   const order = await prisma.order.findUnique({ where: { id: orderId } });
-  if (!order || order.status !== "completed") redirect(`/admin/orders?error=${q("Order must be completed first.")}`);
-  await prisma.order.update({ where: { id: orderId }, data: { publisherPaid: true } });
-  redirect(`/admin/orders?success=${q("Marked publisher as paid.")}`);
+  if (!order || !["live", "completed"].includes(order.status)) {
+    redirect(`/admin/orders?error=${q("The link must be live before you can pay the publisher.")}`);
+  }
+  // Paying settles the order: mark paid and close it (releases the buyer's hold).
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { publisherPaid: true, status: "completed" },
+  });
+  revalidatePath("/admin/orders");
+  redirect(`/admin/orders?success=${q("Publisher marked as paid. Buyer hold released.")}`);
 }

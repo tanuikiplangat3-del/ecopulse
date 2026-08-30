@@ -27,10 +27,14 @@ export default async function DashboardPage({
 }
 
 async function BuyerDash({ userId, balance }: { userId: number; balance: number }) {
-  const [total, pending, live, recent] = await Promise.all([
+  const [total, pending, live, holdAgg, recent] = await Promise.all([
     prisma.order.count({ where: { buyerId: userId } }),
     prisma.order.count({ where: { buyerId: userId, status: { in: ["pending_payment", "funded", "in_progress"] } } }),
     prisma.order.count({ where: { buyerId: userId, status: { in: ["live", "completed"] } } }),
+    prisma.order.aggregate({
+      _sum: { amountCents: true },
+      where: { buyerId: userId, publisherPaid: false, status: { in: ["funded", "in_progress", "live"] } },
+    }),
     prisma.order.findMany({
       where: { buyerId: userId },
       include: { listing: true },
@@ -38,11 +42,15 @@ async function BuyerDash({ userId, balance }: { userId: number; balance: number 
       take: 8,
     }),
   ]);
+  const onHold = holdAgg._sum.amountCents || 0;
 
   return (
     <div>
-      <div className="grid gap-5 md:grid-cols-4">
-        <Link href="/topup" className="card hover:border-wt-green/50"><p className="muted text-sm">Wallet balance</p><p className="text-3xl font-bold text-wt-green">{money(balance)}</p><p className="mt-4 text-sm font-semibold text-wt-green">Top up →</p></Link>
+      <div className="mb-5 grid gap-5 sm:grid-cols-2">
+        <Link href="/topup" className="card hover:border-wt-green/50"><p className="muted text-sm">Available balance</p><p className="text-4xl font-bold text-wt-green">{money(balance)}</p><p className="mt-4 text-sm font-semibold text-wt-green">Top up →</p></Link>
+        <div className="card"><p className="muted text-sm">On hold (orders being processed)</p><p className="text-4xl font-bold text-wt-yellow">{money(onHold)}</p><p className="muted mt-4 text-xs">Released once you confirm the live link.</p></div>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-3">
         <Link href="/orders" className="card hover:border-wt-green/50"><p className="muted text-sm">Orders placed</p><p className="text-3xl font-bold">{total}</p><p className="mt-4 text-sm font-semibold text-wt-green">View all →</p></Link>
         <Link href="/orders?f=pending" className="card hover:border-wt-green/50"><p className="muted text-sm">Pending</p><p className="text-3xl font-bold text-wt-yellow">{pending}</p><p className="mt-4 text-sm font-semibold text-wt-green">View pending →</p></Link>
         <Link href="/orders?f=live" className="card hover:border-wt-green/50"><p className="muted text-sm">Live links</p><p className="text-3xl font-bold text-[#8ea0ff]">{live}</p><p className="mt-4 text-sm font-semibold text-wt-green">View live links →</p></Link>
@@ -83,15 +91,18 @@ async function BuyerDash({ userId, balance }: { userId: number; balance: number 
 }
 
 async function PublisherDash({ user }: { user: any }) {
-  const [sites, toFulfill, earnedAgg] = await Promise.all([
+  const [sites, toFulfill, pendingAgg, paidAgg] = await Promise.all([
     prisma.listing.count({ where: { publisherId: user.id } }),
-    prisma.order.count({ where: { listing: { publisherId: user.id }, status: { in: ["funded", "in_progress"] } } }),
-    prisma.order.aggregate({ _sum: { payoutCents: true }, where: { listing: { publisherId: user.id }, status: "completed" } }),
+    prisma.order.count({ where: { listing: { publisherId: user.id }, status: { in: ["funded", "in_progress", "live"] } } }),
+    // Owed to the publisher: delivered (live/completed) but not yet paid out.
+    prisma.order.aggregate({ _sum: { payoutCents: true }, where: { listing: { publisherId: user.id }, status: { in: ["live", "completed"] }, publisherPaid: false } }),
+    // Already paid out (resets to zero after the admin confirms each payment).
+    prisma.order.aggregate({ _sum: { payoutCents: true }, where: { listing: { publisherId: user.id }, publisherPaid: true } }),
   ]);
-  const earned = earnedAgg._sum.payoutCents || 0;
-  const withdrawn = user.withdrawnCents || 0;
-  const available = Math.max(earned - withdrawn, 0);
-  const hasPayout = !!(user.payMethod || user.payMpesa || user.payBank || user.payPaypal);
+  const available = pendingAgg._sum.payoutCents || 0;
+  const paid = paidAgg._sum.payoutCents || 0;
+  const earned = available + paid;
+  const hasPayout = !!(user.payMethod || user.payMpesa || user.payPaypal);
 
   return (
     <div>
@@ -108,8 +119,8 @@ async function PublisherDash({ user }: { user: any }) {
       )}
 
       <div className="grid gap-5 md:grid-cols-3">
-        <div className="card"><p className="muted text-sm">Available balance</p><p className="text-3xl font-bold text-wt-green">{money(available)}</p><Link href="/payout" className="btn-ghost btn-sm mt-4">Payment details</Link></div>
-        <div className="card"><p className="muted text-sm">Total received</p><p className="text-3xl font-bold">{money(withdrawn)}</p></div>
+        <div className="card"><p className="muted text-sm">Available (to be paid)</p><p className="text-3xl font-bold text-wt-green">{money(available)}</p><Link href="/payout" className="btn-ghost btn-sm mt-4">Payment details</Link></div>
+        <div className="card"><p className="muted text-sm">Total received</p><p className="text-3xl font-bold">{money(paid)}</p></div>
         <div className="card"><p className="muted text-sm">Total earned</p><p className="text-3xl font-bold">{money(earned)}</p></div>
       </div>
 
@@ -138,6 +149,7 @@ async function AdminDash() {
       <Link href="/admin/listings" className="card hover:border-wt-green/50"><p className="muted text-sm">Pending listings</p><p className="text-3xl font-bold text-wt-yellow">{pending}</p></Link>
       <Link href="/admin/orders" className="card hover:border-wt-green/50"><p className="muted text-sm">Orders</p><p className="text-3xl font-bold">{orders}</p></Link>
       <Link href="/admin/invites" className="card hover:border-wt-green/50"><p className="muted text-sm">Open invites</p><p className="text-3xl font-bold">{invites}</p></Link>
+      <Link href="/admin/payments" className="card hover:border-wt-green/50"><p className="muted text-sm">Payment history</p><p className="text-lg font-bold text-wt-green">Deposits &amp; payouts →</p></Link>
     </div>
   );
 }

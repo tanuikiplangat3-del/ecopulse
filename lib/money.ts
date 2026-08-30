@@ -16,6 +16,16 @@ export function commissionRate(): number {
 /** Flat platform markup added on top of every publisher price (USD cents). */
 export const STANDARD_MARKUP_CENTS = 3000; // $30
 
+/** Standard service fee charged on every deposit (5%). */
+export const SERVICE_FEE_RATE = 0.05;
+export function depositFee(grossCents: number): number {
+  return Math.round(grossCents * SERVICE_FEE_RATE);
+}
+/** What actually lands in the wallet after the 5% service fee. */
+export function netDeposit(grossCents: number): number {
+  return grossCents - depositFee(grossCents);
+}
+
 /**
  * What the buyer pays: the publisher's price plus our standard $30 markup.
  * The publisher still receives exactly their own price; admins see the real

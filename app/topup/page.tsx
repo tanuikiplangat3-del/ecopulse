@@ -25,7 +25,11 @@ export default async function TopupPage({ searchParams }: { searchParams: { [key
           </label>
           <button className="btn-primary" type="submit" disabled={!stripeEnabled()}>Top up</button>
         </form>
-        {!stripeEnabled() && <p className="muted mt-3 text-xs">Card top-ups activate once Stripe keys are added.</p>}
+        <p className="muted mt-3 text-xs">
+          A 5% service fee applies to every deposit. For example, deposit $100 and $95.00 is
+          added to your balance. You will receive an invoice within 24 hours.
+        </p>
+        {!stripeEnabled() && <p className="muted mt-2 text-xs">Card top-ups activate once Stripe keys are added.</p>}
       </div>
 
       {txs.length > 0 && (

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
-import { emailEnabled, sendOrderNotice } from "@/lib/email";
+import { emailEnabled, sendOrderNotice, sendDepositReceipt } from "@/lib/email";
+import { netDeposit } from "@/lib/money";
 
 // Stripe needs the raw body to verify the signature.
 export const runtime = "nodejs";
@@ -50,10 +51,25 @@ export async function POST(req: NextRequest) {
             }
           }
         } else if (tx.purpose === "topup") {
+          // Apply the 5% service fee: only the net amount lands in the wallet.
+          const net = netDeposit(tx.amountCents);
+          const fee = tx.amountCents - net;
           await prisma.$transaction([
-            prisma.user.update({ where: { id: tx.userId }, data: { balanceCents: { increment: tx.amountCents } } }),
-            prisma.walletTx.create({ data: { userId: tx.userId, kind: "topup", amountCents: tx.amountCents, method: "stripe", note: "Wallet top-up" } }),
+            prisma.user.update({ where: { id: tx.userId }, data: { balanceCents: { increment: net } } }),
+            prisma.walletTx.create({
+              data: {
+                userId: tx.userId,
+                kind: "topup",
+                amountCents: net,
+                method: "stripe",
+                note: `Deposit gross ${tx.amountCents} cents, 5% fee ${fee} cents`,
+              },
+            }),
           ]);
+          if (emailEnabled()) {
+            const u = await prisma.user.findUnique({ where: { id: tx.userId } });
+            if (u) await sendDepositReceipt(u.email, tx.amountCents, net);
+          }
         }
       }
     }

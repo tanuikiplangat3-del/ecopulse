@@ -143,6 +143,21 @@ export async function confirmLiveAction(formData: FormData) {
   redirect(`/orders/${orderId}?success=${q("Order completed. Thank you!")}`);
 }
 
+/** Admin confirms the link is live on the buyer's behalf -> completed. */
+export async function adminConfirmLiveAction(formData: FormData) {
+  const user = await requireUser();
+  if (user.role !== "admin") redirect(`/orders?error=${q("Admins only.")}`);
+  const orderId = parseInt(String(formData.get("orderId") || "0"));
+  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { buyer: true } });
+  if (!order || order.status !== "live") redirect(`/admin/orders?error=${q("Order is not awaiting confirmation.")}`);
+  await prisma.order.update({ where: { id: orderId }, data: { status: "completed" } });
+  if (emailEnabled() && order!.buyer) {
+    await sendOrderNotice(order!.buyer.email, "Your order is complete", `Order #${orderId} has been confirmed live and marked complete.`);
+  }
+  revalidatePath("/admin/orders");
+  redirect(`/admin/orders?success=${q("Order confirmed live.")}`);
+}
+
 export async function cancelOrderAction(formData: FormData) {
   const user = await requireUser();
   const orderId = parseInt(String(formData.get("orderId") || "0"));
