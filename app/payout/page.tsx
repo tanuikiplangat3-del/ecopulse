@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { savePayoutAction } from "@/app/actions/listings";
 import { Flash } from "@/components/ui";
 import SearchSelect from "@/components/SearchSelect";
+import PayoutFields from "@/components/PayoutFields";
 import { COUNTRIES } from "@/lib/data";
 import { one } from "@/lib/util";
 
@@ -30,35 +31,15 @@ export default async function PayoutPage({
 
       <form action={savePayoutAction} className="card">
         {first && <input type="hidden" name="first" value="1" />}
-        <label className="field">
-          <span>Preferred payout method</span>
-          <select className="select" name="payMethod" defaultValue={me?.payMethod || "mpesa"}>
-            <option value="mpesa">M-Pesa</option>
-            <option value="bank">Bank transfer</option>
-            <option value="paypal">PayPal</option>
-            <option value="card">Card / other</option>
-          </select>
-        </label>
+        <PayoutFields
+          method={me?.payMethod || "mpesa"}
+          mpesa={me?.payMpesa || ""}
+          paypal={me?.payPaypal || ""}
+        />
         <div className="field">
           <span>Country</span>
           <SearchSelect name="payCountry" options={COUNTRIES} defaultValue={me?.payCountry || ""} placeholder="Choose" title="Choose your country" />
         </div>
-        <label className="field">
-          <span>M-Pesa phone number</span>
-          <input className="input" name="payMpesa" defaultValue={me?.payMpesa || ""} placeholder="07XX XXX XXX" />
-        </label>
-        <label className="field">
-          <span>Bank name and account number</span>
-          <input className="input" name="payBank" defaultValue={me?.payBank || ""} placeholder="Bank, account name, account number" />
-        </label>
-        <label className="field">
-          <span>PayPal email</span>
-          <input className="input" name="payPaypal" defaultValue={me?.payPaypal || ""} placeholder="you@example.com" />
-        </label>
-        <label className="field">
-          <span>Card or other details (optional)</span>
-          <input className="input" name="payCard" defaultValue={me?.payCard || ""} placeholder="Any other payout detail" />
-        </label>
         <button className="btn-primary" type="submit">{first ? "Finish setup" : "Save payment details"}</button>
       </form>
     </div>

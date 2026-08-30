@@ -42,10 +42,10 @@ async function BuyerDash({ userId, balance }: { userId: number; balance: number 
   return (
     <div>
       <div className="grid gap-5 md:grid-cols-4">
-        <div className="card"><p className="muted text-sm">Wallet balance</p><p className="text-3xl font-bold text-wt-green">{money(balance)}</p><Link href="/topup" className="btn-ghost btn-sm mt-4">Top up</Link></div>
-        <div className="card"><p className="muted text-sm">Orders placed</p><p className="text-3xl font-bold">{total}</p><Link href="/orders" className="btn-ghost btn-sm mt-4">View all</Link></div>
-        <div className="card"><p className="muted text-sm">Pending</p><p className="text-3xl font-bold text-wt-yellow">{pending}</p></div>
-        <div className="card"><p className="muted text-sm">Live links</p><p className="text-3xl font-bold text-[#8ea0ff]">{live}</p><Link href="/marketplace" className="btn-primary btn-sm mt-4">Browse sites</Link></div>
+        <Link href="/topup" className="card hover:border-wt-green/50"><p className="muted text-sm">Wallet balance</p><p className="text-3xl font-bold text-wt-green">{money(balance)}</p><p className="mt-4 text-sm font-semibold text-wt-green">Top up →</p></Link>
+        <Link href="/orders" className="card hover:border-wt-green/50"><p className="muted text-sm">Orders placed</p><p className="text-3xl font-bold">{total}</p><p className="mt-4 text-sm font-semibold text-wt-green">View all →</p></Link>
+        <Link href="/orders?f=pending" className="card hover:border-wt-green/50"><p className="muted text-sm">Pending</p><p className="text-3xl font-bold text-wt-yellow">{pending}</p><p className="mt-4 text-sm font-semibold text-wt-green">View pending →</p></Link>
+        <Link href="/orders?f=live" className="card hover:border-wt-green/50"><p className="muted text-sm">Live links</p><p className="text-3xl font-bold text-[#8ea0ff]">{live}</p><p className="mt-4 text-sm font-semibold text-wt-green">View live links →</p></Link>
       </div>
 
       <h2 className="h3 mb-3 mt-8">Your orders</h2>

@@ -1,10 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-import { StatusBadge } from "@/components/ui";
+import { StatusBadge, Flash } from "@/components/ui";
+import { approveApplicationAction, rejectApplicationAction } from "@/app/actions/admin";
 
 export const metadata = { title: "Publisher requests" };
 
-export default async function AdminApplications() {
+export default async function AdminApplications({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   await requireRole("admin");
   const apps = await prisma.publisherApplication.findMany({ orderBy: { createdAt: "desc" } });
 
@@ -12,6 +17,7 @@ export default async function AdminApplications() {
     <div>
       <h1 className="h2 mb-1">Publisher requests</h1>
       <p className="muted mb-6">People who asked to be listed on the marketplace.</p>
+      <Flash searchParams={searchParams} />
 
       {apps.length === 0 ? (
         <div className="card muted">No requests yet.</div>
@@ -37,6 +43,24 @@ export default async function AdminApplications() {
                 <div className="mt-2">
                   <p className="muted text-xs">Note</p>
                   <p className="text-sm text-white/80">{a.note}</p>
+                </div>
+              )}
+
+              {a.status === "new" && (
+                <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-start">
+                  <form action={approveApplicationAction}>
+                    <input type="hidden" name="id" value={a.id} />
+                    <button type="submit" className="btn-primary btn-sm">Approve &amp; send invite</button>
+                  </form>
+                  <form action={rejectApplicationAction} className="flex flex-1 flex-wrap items-center gap-2">
+                    <input type="hidden" name="id" value={a.id} />
+                    <input
+                      className="input flex-1"
+                      name="note"
+                      placeholder="Reason for rejection (optional, included in the email)"
+                    />
+                    <button type="submit" className="btn-danger btn-sm">Reject</button>
+                  </form>
                 </div>
               )}
             </div>

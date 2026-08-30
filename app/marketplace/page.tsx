@@ -45,11 +45,36 @@ export default async function MarketplacePage({
   }
 
   // Guests see a sample of six, then a sign-up call to action.
-  const listings = await prisma.listing.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: user ? 60 : 6,
-  });
+  // Signed-in buyers see 30 per page with Next / Previous paging.
+  const PAGE_SIZE = 30;
+  const page = Math.max(1, parseInt(one(searchParams.page) || "1") || 1);
+
+  let listings;
+  let totalPages = 1;
+  if (user) {
+    const total = await prisma.listing.count({ where });
+    totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    listings = await prisma.listing.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    });
+  } else {
+    listings = await prisma.listing.findMany({ where, orderBy: { createdAt: "desc" }, take: 6 });
+  }
+
+  // Preserve active filters when moving between pages.
+  const filterParams = new URLSearchParams();
+  for (const k of ["q", "country", "language", "niche", "min", "max"]) {
+    const v = one(searchParams[k as keyof typeof searchParams] as any);
+    if (v) filterParams.set(k, v);
+  }
+  const pageHref = (p: number) => {
+    const s = new URLSearchParams(filterParams);
+    s.set("page", String(p));
+    return `/marketplace?${s.toString()}`;
+  };
 
   return (
     <div>
@@ -98,6 +123,22 @@ export default async function MarketplacePage({
           {listings.map((l) => (
             <ListingCard key={l.id} listing={l} />
           ))}
+        </div>
+      )}
+
+      {user && totalPages > 1 && (
+        <div className="mt-8 flex items-center justify-center gap-4">
+          {page > 1 ? (
+            <Link href={pageHref(page - 1)} className="btn-ghost btn-sm">← Previous</Link>
+          ) : (
+            <span className="btn-ghost btn-sm cursor-not-allowed opacity-40">← Previous</span>
+          )}
+          <span className="muted text-sm">Page {page} of {totalPages}</span>
+          {page < totalPages ? (
+            <Link href={pageHref(page + 1)} className="btn-ghost btn-sm">Next →</Link>
+          ) : (
+            <span className="btn-ghost btn-sm cursor-not-allowed opacity-40">Next →</span>
+          )}
         </div>
       )}
 

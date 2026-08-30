@@ -2,31 +2,51 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { money } from "@/lib/money";
+import { one } from "@/lib/util";
 import { StatusBadge, Flash, EmptyState } from "@/components/ui";
 
 export default async function OrdersPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   const user = await requireUser();
+  const f = one(searchParams.f);
 
-  const where =
+  const roleWhere: any =
     user.role === "buyer"
       ? { buyerId: user.id }
       : user.role === "publisher"
       ? { listing: { publisherId: user.id } }
       : {};
 
+  const filter: any = {};
+  if (f === "pending") filter.status = { in: ["pending_payment", "funded", "in_progress"] };
+  if (f === "live") filter.status = { in: ["live", "completed"] };
+  const where = { ...roleWhere, ...filter };
+
   const orders = await prisma.order.findMany({
     where,
     include: { listing: true, buyer: true },
     orderBy: { createdAt: "desc" },
-    take: 100,
+    take: 200,
   });
+
+  const heading = f === "live" ? "Live links" : f === "pending" ? "Pending orders" : "Orders";
+  const subtitle =
+    f === "live"
+      ? "Every live link you have acquired."
+      : f === "pending"
+      ? "Orders that are awaiting payment or in progress."
+      : user.role === "buyer"
+      ? "Your placement orders."
+      : user.role === "publisher"
+      ? "Orders on your sites."
+      : "All orders.";
 
   return (
     <div>
-      <h1 className="h2 mb-1">Orders</h1>
-      <p className="muted mb-6">
-        {user.role === "buyer" ? "Your placement orders." : user.role === "publisher" ? "Orders on your sites." : "All orders."}
-      </p>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <h1 className="h2">{heading}</h1>
+        {f && <Link href="/orders" className="text-sm font-semibold text-wt-green">Show all →</Link>}
+      </div>
+      <p className="muted -mt-4 mb-6">{subtitle}</p>
       <Flash searchParams={searchParams} />
 
       {orders.length === 0 ? (
@@ -43,7 +63,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                 <th>#</th><th>Site</th>
                 {user.role !== "buyer" && <th>Buyer</th>}
                 <th>{user.role === "publisher" ? "Payout" : "Amount"}</th>
-                <th>Status</th><th></th>
+                <th>Status</th><th>Live URL</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -54,7 +74,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                   {user.role !== "buyer" && <td className="muted">{o.buyer.name}</td>}
                   <td>{money(user.role === "publisher" ? o.payoutCents : o.amountCents)}</td>
                   <td><StatusBadge status={o.status} /></td>
-                  <td><Link href={`/orders/${o.id}`} className="text-wt-green">Open →</Link></td>
+                  <td>
+                    {o.liveUrl ? (
+                      <a href={o.liveUrl} target="_blank" rel="noopener noreferrer" className="text-wt-green break-all hover:underline">{o.liveUrl}</a>
+                    ) : (
+                      <span className="muted">-</span>
+                    )}
+                  </td>
+                  <td><Link href={`/orders/${o.id}`} className="text-wt-green whitespace-nowrap">Open →</Link></td>
                 </tr>
               ))}
             </tbody>

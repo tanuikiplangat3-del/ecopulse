@@ -124,6 +124,21 @@ export function sendBuyerSignupAdmin(name: string, email: string) {
   );
 }
 
+/** Applicant was rejected -> tell them, with an optional note from the admin. */
+export function sendApplicationRejected(to: string, note: string) {
+  return send(
+    to,
+    "Update on your publisher request - Welcome Tomorrow",
+    wrap(
+      "About your publisher request",
+      `<p>Thank you for your interest in listing on the Welcome Tomorrow marketplace.</p>
+       <p>After review, we are unable to approve your website(s) at this time.</p>
+       ${note ? `<p><strong>Note from our team:</strong><br>${esc(note)}</p>` : ""}
+       <p>You are welcome to apply again in the future as your site grows.</p>`
+    )
+  );
+}
+
 /** Someone requested to be listed as a publisher -> notify the admin desk. */
 export function sendPublisherApplicationAdmin(input: { name: string; email: string; urls: string }) {
   return send(

@@ -6,7 +6,7 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { appUrl } from "@/lib/stripe";
-import { emailEnabled, sendInviteEmail } from "@/lib/email";
+import { emailEnabled, sendInviteEmail, sendApplicationRejected } from "@/lib/email";
 
 const q = (s: string) => encodeURIComponent(s);
 
@@ -87,6 +87,43 @@ export async function deleteUserAction(formData: FormData) {
   revalidatePath("/admin/users");
   revalidatePath("/marketplace");
   redirect(`/admin/users?success=${q("Deleted " + target!.email + ".")}`);
+}
+
+/** Approve a publisher request: create an invite and email them the sign-up link. */
+export async function approveApplicationAction(formData: FormData) {
+  await requireRole("admin");
+  const id = parseInt(String(formData.get("id") || "0"));
+  const app = await prisma.publisherApplication.findUnique({ where: { id } });
+  if (!app) redirect(`/admin/applications?error=${q("Request not found.")}`);
+
+  const existing = await prisma.user.findUnique({ where: { email: app!.email } });
+  if (existing) {
+    await prisma.publisherApplication.update({ where: { id }, data: { status: "approved" } });
+    redirect(`/admin/applications?error=${q("An account already exists for that email.")}`);
+  }
+
+  const token = randomBytes(24).toString("hex");
+  await prisma.invite.create({
+    data: { email: app!.email, token, role: "publisher", expiresAt: new Date(Date.now() + 7 * 86400_000) },
+  });
+  const link = `${appUrl()}/accept-invite?token=${token}`;
+  if (emailEnabled()) await sendInviteEmail(app!.email, link);
+  await prisma.publisherApplication.update({ where: { id }, data: { status: "approved" } });
+  revalidatePath("/admin/applications");
+  redirect(`/admin/applications?success=${q(emailEnabled() ? "Approved. Sign-up link emailed to " + app!.email : "Approved. Share this link: " + link)}`);
+}
+
+/** Reject a publisher request: email the applicant with an optional note. */
+export async function rejectApplicationAction(formData: FormData) {
+  await requireRole("admin");
+  const id = parseInt(String(formData.get("id") || "0"));
+  const note = String(formData.get("note") || "").trim();
+  const app = await prisma.publisherApplication.findUnique({ where: { id } });
+  if (!app) redirect(`/admin/applications?error=${q("Request not found.")}`);
+  if (emailEnabled()) await sendApplicationRejected(app!.email, note);
+  await prisma.publisherApplication.update({ where: { id }, data: { status: "rejected" } });
+  revalidatePath("/admin/applications");
+  redirect(`/admin/applications?success=${q("Request rejected and the applicant was notified.")}`);
 }
 
 export async function markPublisherPaidAction(formData: FormData) {
