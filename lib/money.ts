@@ -13,9 +13,16 @@ export function commissionRate(): number {
   return isNaN(r) ? 0 : r;
 }
 
-/** What the buyer pays, given the publisher's price (both in cents). */
+/** Flat platform markup added on top of every publisher price (USD cents). */
+export const STANDARD_MARKUP_CENTS = 3000; // $30
+
+/**
+ * What the buyer pays: the publisher's price plus our standard $30 markup.
+ * The publisher still receives exactly their own price; admins see the real
+ * publisher price, buyers see this marked-up total.
+ */
 export function buyerPrice(publisherCents: number): number {
-  return Math.round(publisherCents * (1 + commissionRate()));
+  return publisherCents + STANDARD_MARKUP_CENTS;
 }
 
 export function trafficShort(n: number): string {

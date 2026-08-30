@@ -6,6 +6,7 @@ export function StatusBadge({ status }: { status: string }) {
     completed: "badge-green",
     live: "badge-blue",
     funded: "badge-blue",
+    in_progress: "badge-yellow",
     pending: "badge-yellow",
     pending_payment: "badge-yellow",
     open: "badge-yellow",

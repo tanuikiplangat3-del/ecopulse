@@ -63,7 +63,17 @@ export default async function AcceptInvitePage({
                 </div>
               </fieldset>
 
-              <button className="btn-primary w-full" type="submit">
+              <label className="mt-2 flex items-start gap-3 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
+                <input type="checkbox" name="agreeTuesday" className="mt-1" required />
+                <span>
+                  I understand and agree that all payments for all orders are paid weekly on
+                  <strong> Tuesday</strong>. If a payment is not received by then, I will contact
+                  seo@welcometomorrow.io to resolve it. I understand my site will not be listed if
+                  I do not agree.
+                </span>
+              </label>
+
+              <button className="btn-primary mt-4 w-full" type="submit">
                 Create my publisher account
               </button>
             </form>

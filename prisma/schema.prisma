@@ -31,6 +31,7 @@ model User {
   payPaypal      String?  // PayPal email
   payMpesa       String?  // M-Pesa phone
   payCard        String?  // card / other note
+  tuesdayAgreed  Boolean  @default(false) // publisher accepted the Tuesday payout terms
   verified       Boolean  @default(false)
   createdAt      DateTime @default(now())
 
@@ -153,4 +154,17 @@ model EmailVerification {
 model Setting {
   key   String @id
   value String?
+}
+
+/** Public "request to be a publisher" applications, reviewed by admins. */
+model PublisherApplication {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  urls      String   // newline/comma-separated list of website URLs for review
+  note      String?
+  status    String   @default("new") // new | reviewing | approved | rejected
+  createdAt DateTime @default(now())
+
+  @@index([status])
 }

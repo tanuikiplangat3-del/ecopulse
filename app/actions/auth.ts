@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword, createSession, destroySession } from "@/lib/auth";
-import { emailEnabled, sendVerificationEmail } from "@/lib/email";
+import { emailEnabled, sendVerificationEmail, sendBuyerSignupAdmin } from "@/lib/email";
 import { appUrl } from "@/lib/stripe";
 import { randomBytes } from "crypto";
 
@@ -35,6 +35,9 @@ export async function registerAction(formData: FormData) {
       verified: !emailEnabled(),
     },
   });
+
+  // Let the admin desk know a new buyer joined (best-effort).
+  await sendBuyerSignupAdmin(name, email);
 
   if (emailEnabled()) {
     const token = randomBytes(24).toString("hex");
@@ -118,12 +121,15 @@ export async function acceptInviteAction(formData: FormData) {
   const password = String(formData.get("password") || "");
 
   const sites = String(formData.get("sites") || "single");
+  const agreedTuesday = String(formData.get("agreeTuesday") || "") === "on";
   const invite = await prisma.invite.findUnique({ where: { token } });
   if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
     redirect(`/accept-invite?token=${q(token)}&error=${q("This invite is invalid or has expired.")}`);
   }
   const email = (String(formData.get("email") || "") || invite!.email || "").trim().toLowerCase();
   if (!name) redirect(`/accept-invite?token=${q(token)}&error=${q("Please enter your name.")}`);
+  if (!agreedTuesday)
+    redirect(`/accept-invite?token=${q(token)}&error=${q("You must agree that payouts are made every Tuesday to be listed.")}`);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     redirect(`/accept-invite?token=${q(token)}&error=${q("Enter a valid email address.")}`);
   if (password.length < 8)
@@ -141,6 +147,7 @@ export async function acceptInviteAction(formData: FormData) {
       passwordHash: await hashPassword(password),
       role: "publisher",
       verified: true,
+      tuesdayAgreed: true,
     },
   });
   await prisma.invite.update({ where: { token }, data: { acceptedAt: new Date() } });

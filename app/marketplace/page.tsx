@@ -6,7 +6,7 @@ import ListingCard from "@/components/ListingCard";
 import SearchSelect from "@/components/SearchSelect";
 import { Flash } from "@/components/ui";
 import { NICHES, COUNTRIES, LANGUAGES } from "@/lib/data";
-import { centsFromUsd } from "@/lib/money";
+import { centsFromUsd, STANDARD_MARKUP_CENTS } from "@/lib/money";
 import { one } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +36,12 @@ export default async function MarketplacePage({
   if (country) where.country = country;
   if (niche) where.category = { contains: niche };
   if (language) where.language = language;
+  // Buyers filter on the price they see (publisher price + standard markup),
+  // so translate the bounds back to the stored publisher price.
   if (!isNaN(min) || !isNaN(max)) {
     where.priceCents = {};
-    if (!isNaN(min)) where.priceCents.gte = centsFromUsd(min);
-    if (!isNaN(max)) where.priceCents.lte = centsFromUsd(max);
+    if (!isNaN(min)) where.priceCents.gte = centsFromUsd(min) - STANDARD_MARKUP_CENTS;
+    if (!isNaN(max)) where.priceCents.lte = centsFromUsd(max) - STANDARD_MARKUP_CENTS;
   }
 
   // Guests see a sample of six, then a sign-up call to action.

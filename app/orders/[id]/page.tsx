@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { money } from "@/lib/money";
 import { StatusBadge, Flash } from "@/components/ui";
-import { payFromWalletAction, payWithStripeAction, submitLiveAction, confirmLiveAction, cancelOrderAction } from "@/app/actions/orders";
+import { payFromWalletAction, payWithStripeAction, submitLiveAction, confirmLiveAction, cancelOrderAction, confirmReceiptAction } from "@/app/actions/orders";
 import { stripeEnabled } from "@/lib/stripe";
 
 export default async function OrderPage({
@@ -100,6 +100,17 @@ export default async function OrderPage({
       )}
 
       {isPublisher && order!.status === "funded" && (
+        <div className="card">
+          <h2 className="h3 mb-3">Confirm you received this order</h2>
+          <p className="muted mb-4 text-sm">Confirm receipt to move this order into progress, then publish the link and submit the live URL.</p>
+          <form action={confirmReceiptAction}>
+            <input type="hidden" name="orderId" value={order!.id} />
+            <button className="btn-primary" type="submit">Confirm receipt</button>
+          </form>
+        </div>
+      )}
+
+      {isPublisher && order!.status === "in_progress" && (
         <div className="card">
           <h2 className="h3 mb-3">Submit the live link</h2>
           <form action={submitLiveAction}>

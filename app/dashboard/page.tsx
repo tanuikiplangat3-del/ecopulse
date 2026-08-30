@@ -29,7 +29,7 @@ export default async function DashboardPage({
 async function BuyerDash({ userId, balance }: { userId: number; balance: number }) {
   const [total, pending, live, recent] = await Promise.all([
     prisma.order.count({ where: { buyerId: userId } }),
-    prisma.order.count({ where: { buyerId: userId, status: { in: ["pending_payment", "funded"] } } }),
+    prisma.order.count({ where: { buyerId: userId, status: { in: ["pending_payment", "funded", "in_progress"] } } }),
     prisma.order.count({ where: { buyerId: userId, status: { in: ["live", "completed"] } } }),
     prisma.order.findMany({
       where: { buyerId: userId },
@@ -85,7 +85,7 @@ async function BuyerDash({ userId, balance }: { userId: number; balance: number 
 async function PublisherDash({ user }: { user: any }) {
   const [sites, toFulfill, earnedAgg] = await Promise.all([
     prisma.listing.count({ where: { publisherId: user.id } }),
-    prisma.order.count({ where: { listing: { publisherId: user.id }, status: "funded" } }),
+    prisma.order.count({ where: { listing: { publisherId: user.id }, status: { in: ["funded", "in_progress"] } } }),
     prisma.order.aggregate({ _sum: { payoutCents: true }, where: { listing: { publisherId: user.id }, status: "completed" } }),
   ]);
   const earned = earnedAgg._sum.payoutCents || 0;
@@ -122,15 +122,19 @@ async function PublisherDash({ user }: { user: any }) {
 }
 
 async function AdminDash() {
-  const [users, pending, orders, invites] = await Promise.all([
-    prisma.user.count(),
+  const [buyers, publishers, pending, orders, invites, apps] = await Promise.all([
+    prisma.user.count({ where: { role: "buyer" } }),
+    prisma.user.count({ where: { role: "publisher" } }),
     prisma.listing.count({ where: { status: "pending" } }),
     prisma.order.count(),
     prisma.invite.count({ where: { acceptedAt: null } }),
+    prisma.publisherApplication.count({ where: { status: "new" } }),
   ]);
   return (
-    <div className="grid gap-5 md:grid-cols-4">
-      <Link href="/admin/users" className="card hover:border-wt-green/50"><p className="muted text-sm">Users</p><p className="text-3xl font-bold">{users}</p></Link>
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <Link href="/admin/users" className="card hover:border-wt-green/50"><p className="muted text-sm">Buyers</p><p className="text-3xl font-bold">{buyers}</p></Link>
+      <Link href="/admin/users" className="card hover:border-wt-green/50"><p className="muted text-sm">Publishers</p><p className="text-3xl font-bold">{publishers}</p></Link>
+      <Link href="/admin/applications" className="card hover:border-wt-green/50"><p className="muted text-sm">Publisher requests</p><p className="text-3xl font-bold text-wt-yellow">{apps}</p></Link>
       <Link href="/admin/listings" className="card hover:border-wt-green/50"><p className="muted text-sm">Pending listings</p><p className="text-3xl font-bold text-wt-yellow">{pending}</p></Link>
       <Link href="/admin/orders" className="card hover:border-wt-green/50"><p className="muted text-sm">Orders</p><p className="text-3xl font-bold">{orders}</p></Link>
       <Link href="/admin/invites" className="card hover:border-wt-green/50"><p className="muted text-sm">Open invites</p><p className="text-3xl font-bold">{invites}</p></Link>

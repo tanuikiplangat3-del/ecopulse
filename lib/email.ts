@@ -1,8 +1,11 @@
 import { Resend } from "resend";
 
 const key = process.env.RESEND_API_KEY || "";
-const from = process.env.MAIL_FROM || "Welcome Tomorrow Ecopulse <seo-desk@ecopulse.co.ke>";
+const from = process.env.MAIL_FROM || "Welcome Tomorrow <seo@welcometomorrow.io>";
 const resend = key ? new Resend(key) : null;
+
+/** Where internal notifications (new orders, signups, applications) are sent. */
+export const ADMIN_NOTIFY = process.env.ADMIN_NOTIFY_EMAIL || "seo@welcometomorrow.io";
 
 export const emailEnabled = (): boolean => !!resend;
 
@@ -76,4 +79,63 @@ export function sendVerificationEmail(to: string, link: string) {
 
 export function sendOrderNotice(to: string, subject: string, message: string) {
   return send(to, subject, wrap(subject, `<p>${message}</p>`));
+}
+
+/** New paid order -> notify the publisher AND the admin desk so both can act. */
+export async function sendNewOrderEmails(input: {
+  publisherEmail: string;
+  domain: string;
+  orderId: number;
+  buyerName?: string;
+}) {
+  const { publisherEmail, domain, orderId } = input;
+  await send(
+    publisherEmail,
+    `New order on ${domain}`,
+    wrap(
+      "You have a new order",
+      `<p>You have received a new order (#${orderId}) for a placement on <strong>${esc(domain)}</strong>.</p>
+       <p>Sign in to your dashboard, open <strong>Orders</strong>, confirm you received it, then publish the link and submit the live URL.</p>`
+    )
+  );
+  await send(
+    ADMIN_NOTIFY,
+    `New order #${orderId} on ${domain}`,
+    wrap(
+      "New order placed",
+      `<p>A new order (#${orderId}) was placed on <strong>${esc(domain)}</strong>${
+        input.buyerName ? ` by ${esc(input.buyerName)}` : ""
+      }.</p>
+       <p>Follow up from the admin Orders page.</p>`
+    )
+  );
+}
+
+/** A new buyer registered -> let the admin desk know. */
+export function sendBuyerSignupAdmin(name: string, email: string) {
+  return send(
+    ADMIN_NOTIFY,
+    "New buyer signed up",
+    wrap(
+      "New buyer account",
+      `<p>A new buyer just created an account:</p>
+       <p><strong>Name:</strong> ${esc(name)}<br><strong>Email:</strong> ${esc(email)}</p>`
+    )
+  );
+}
+
+/** Someone requested to be listed as a publisher -> notify the admin desk. */
+export function sendPublisherApplicationAdmin(input: { name: string; email: string; urls: string }) {
+  return send(
+    ADMIN_NOTIFY,
+    `Publisher request from ${input.name}`,
+    wrap(
+      "New publisher request",
+      `<p>A new publisher has requested to be listed:</p>
+       <p><strong>Name:</strong> ${esc(input.name)}<br><strong>Email:</strong> ${esc(input.email)}</p>
+       <p><strong>Websites for review:</strong></p>
+       <p>${esc(input.urls)}</p>`
+    ),
+    input.email
+  );
 }

@@ -6,10 +6,13 @@ const LOGO = "https://welcometomorrow.io/wp-content/uploads/2025/07/WT-logo-whit
 
 export default async function Nav() {
   const u = await getCurrentUser();
+  // The public home page is only for signed-out visitors. Signed-in users land
+  // on the surface that belongs to their role when they click the logo.
+  const homeHref = !u ? "/" : u.role === "buyer" ? "/marketplace" : "/dashboard";
   return (
     <header className="sticky top-0 z-50 border-b border-white/5 bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px]">
       <div className="container-wt flex h-20 items-center justify-between gap-4">
-        <Link href="/" className="flex items-center" aria-label="Welcome Tomorrow home">
+        <Link href={homeHref} className="flex items-center" aria-label="Welcome Tomorrow">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={LOGO} alt="Welcome Tomorrow" className="h-8 w-auto" />
         </Link>

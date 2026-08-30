@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, requireUser } from "@/lib/auth";
 import { buyerPrice, commissionRate } from "@/lib/money";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
-import { emailEnabled, sendOrderNotice } from "@/lib/email";
+import { emailEnabled, sendOrderNotice, sendNewOrderEmails } from "@/lib/email";
 
 const q = (s: string) => encodeURIComponent(s);
 
@@ -120,7 +120,8 @@ export async function submitLiveAction(formData: FormData) {
   const liveUrl = String(formData.get("liveUrl") || "").trim();
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { listing: true, buyer: true } });
   if (!order || order.listing.publisherId !== user.id) redirect(`/orders?error=${q("Not your order.")}`);
-  if (order!.status !== "funded") redirect(`/orders/${orderId}?error=${q("Order must be funded first.")}`);
+  if (!["funded", "in_progress"].includes(order!.status))
+    redirect(`/orders/${orderId}?error=${q("Confirm you received the order first.")}`);
   if (!/^https?:\/\//.test(liveUrl)) redirect(`/orders/${orderId}?error=${q("Enter a valid live URL.")}`);
 
   await prisma.order.update({ where: { id: orderId }, data: { status: "live", liveUrl } });
@@ -155,7 +156,36 @@ export async function cancelOrderAction(formData: FormData) {
 
 async function notifyPublisherFunded(orderId: number) {
   if (!emailEnabled()) return;
-  const order = await prisma.order.findUnique({ where: { id: orderId }, include: { listing: { include: { publisher: true } } } });
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { listing: { include: { publisher: true } }, buyer: true },
+  });
   const pub = order?.listing.publisher;
-  if (pub) await sendOrderNotice(pub.email, "New funded order", `You have a new funded order #${orderId} on ${order!.listing.domain}. Please publish the link and submit the live URL.`);
+  if (pub) {
+    await sendNewOrderEmails({
+      publisherEmail: pub.email,
+      domain: order!.listing.domain,
+      orderId,
+      buyerName: order!.buyer?.name,
+    });
+  }
+}
+
+/** Publisher confirms they received the order -> status moves to in progress. */
+export async function confirmReceiptAction(formData: FormData) {
+  const user = await requireRole("publisher");
+  const orderId = parseInt(String(formData.get("orderId") || "0"));
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { listing: true, buyer: true },
+  });
+  if (!order || order.listing.publisherId !== user.id) redirect(`/orders?error=${q("Not your order.")}`);
+  if (order!.status !== "funded") redirect(`/orders/${orderId}?error=${q("This order can't be confirmed.")}`);
+
+  await prisma.order.update({ where: { id: orderId }, data: { status: "in_progress" } });
+  if (emailEnabled() && order!.buyer) {
+    await sendOrderNotice(order!.buyer.email, "Your order is in progress", `The publisher has confirmed your order #${orderId} on ${order!.listing.domain} and started work. You'll be notified when the link is live.`);
+  }
+  revalidatePath("/orders");
+  redirect(`/orders/${orderId}?success=${q("Order confirmed. It is now in progress.")}`);
 }

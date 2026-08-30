@@ -1,18 +1,64 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import ListingCard from "@/components/ListingCard";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Link Building Marketplace",
-  description:
-    "Acquire quality backlinks and guest posts from vetted African publishers. Build your backlink profile with escrow-protected orders.",
-};
+const SITE = "https://tools.welcometomorrow.io";
+const PATH = "/ecopulse";
+
+// SEO metadata is generated dynamically from live marketplace data.
+export async function generateMetadata(): Promise<Metadata> {
+  let sites = 0;
+  let countries = 0;
+  try {
+    sites = await prisma.listing.count({ where: { status: "approved" } });
+    const grouped = await prisma.listing.findMany({
+      where: { status: "approved" },
+      distinct: ["country"],
+      select: { country: true },
+    });
+    countries = grouped.length;
+  } catch {
+    // database not reachable at build time - fall back to static copy
+  }
+
+  const description =
+    sites > 0
+      ? `Acquire quality backlinks and guest posts from ${sites}+ vetted publisher websites across ${countries || 54} African markets. Escrow-protected orders, transparent pricing, and verified placements with Welcome Tomorrow.`
+      : "Acquire quality backlinks and guest posts from vetted African publishers. Escrow-protected orders, transparent pricing, and verified placements with Welcome Tomorrow.";
+
+  const title = "Build Your Backlink Profile With African Publishers";
+
+  return {
+    title,
+    description,
+    keywords: [
+      "link building", "backlinks", "guest posts", "niche edits",
+      "backlink marketplace", "African publishers", "buy backlinks Africa",
+      "SEO link building", "Welcome Tomorrow",
+    ],
+    alternates: { canonical: `${SITE}${PATH}` },
+    openGraph: {
+      type: "website",
+      title: `${title} | Welcome Tomorrow`,
+      description,
+      url: `${SITE}${PATH}`,
+      siteName: "Welcome Tomorrow Ecopulse",
+    },
+    twitter: { card: "summary_large_image", title, description },
+    robots: { index: true, follow: true },
+  };
+}
 
 export default async function HomePage() {
   const user = await getCurrentUser();
+  // The home page is for signed-out visitors only. Send members to their surface.
+  if (user) redirect(user.role === "buyer" ? "/marketplace" : "/dashboard");
+
   const featured = await prisma.listing.findMany({
     where: { status: "approved" },
     orderBy: { domainRating: "desc" },
@@ -33,7 +79,7 @@ export default async function HomePage() {
         </p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <Link href="/marketplace" className="btn-primary">Browse the marketplace</Link>
-          {!user && <Link href="/register" className="btn-ghost">Create a free account</Link>}
+          <Link href="/register" className="btn-ghost">Create a free account</Link>
         </div>
       </section>
 
@@ -47,7 +93,7 @@ export default async function HomePage() {
         </div>
 
         {featured.length === 0 ? (
-          <div className="card muted">New sites are being added. Please check back soon.</div>
+          <div className="card muted">New publisher websites are being added. Please check back soon.</div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {featured.map((l) => (
@@ -55,20 +101,36 @@ export default async function HomePage() {
             ))}
           </div>
         )}
+      </section>
 
-        {/* Sign up CTA */}
-        <div className="mt-8 overflow-hidden rounded-lg band-green p-8 text-center text-black md:p-12">
-          <h3 className="text-2xl font-bold md:text-3xl">Ready to build your backlink profile?</h3>
-          <p className="mx-auto mt-2 max-w-xl text-black/80">
-            Create an account to acquire placements from our vetted publishers across Africa.
-          </p>
-          <Link
-            href="/register"
-            className="mt-6 inline-block rounded-pill bg-black px-8 py-3 text-[15px] font-bold uppercase tracking-[0.75px] text-white hover:bg-black/80"
-          >
-            Sign up to acquire from publishers
-          </Link>
+      {/* Become a publisher */}
+      <section className="mt-10 overflow-hidden rounded-lg border border-wt-border bg-wt-surface1 p-8 md:p-12">
+        <div className="grid items-center gap-6 md:grid-cols-[1.5fr_1fr]">
+          <div>
+            <h2 className="text-2xl font-bold md:text-3xl">Are you a reputable publisher?</h2>
+            <p className="muted mt-3 max-w-xl">
+              If you own a website with good authority and constant traffic, request to be listed
+              on the Welcome Tomorrow marketplace. Our team reviews every site before it goes live.
+            </p>
+          </div>
+          <div className="md:text-right">
+            <Link href="/apply" className="btn-accent">Request to be listed</Link>
+          </div>
         </div>
+      </section>
+
+      {/* Sign up CTA */}
+      <section className="mt-8 overflow-hidden rounded-lg band-green p-8 text-center text-black md:p-12">
+        <h3 className="text-2xl font-bold md:text-3xl">Ready to build your backlink profile?</h3>
+        <p className="mx-auto mt-2 max-w-xl text-black/80">
+          Create an account to acquire placements from our vetted publishers across Africa.
+        </p>
+        <Link
+          href="/register"
+          className="mt-6 inline-block rounded-pill bg-black px-8 py-3 text-[15px] font-bold uppercase tracking-[0.75px] text-white hover:bg-black/80"
+        >
+          Sign up to acquire from publishers
+        </Link>
       </section>
     </div>
   );
