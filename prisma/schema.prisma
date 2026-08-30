@@ -156,7 +156,7 @@ model Setting {
   value String?
 }
 
-/** Public "request to be a publisher" applications, reviewed by admins. */
+// Public "request to be a publisher" applications, reviewed by admins.
 model PublisherApplication {
   id        Int      @id @default(autoincrement())
   name      String
