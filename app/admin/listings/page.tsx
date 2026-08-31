@@ -3,12 +3,17 @@ import { requireRole } from "@/lib/auth";
 import { money, trafficShort } from "@/lib/money";
 import { StatusBadge, Flash } from "@/components/ui";
 import { approveListingAction, rejectListingAction, approveAllListingsAction, refreshListingMetricsAction } from "@/app/actions/admin";
+import { REFRESH_AFTER_DAYS } from "@/lib/metrics";
 
 export default async function AdminListings({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   await requireRole("admin");
   const listings = await prisma.listing.findMany({ include: { publisher: true }, orderBy: [{ status: "asc" }, { createdAt: "desc" }] });
   const pendingCount = listings.filter((l) => l.status === "pending").length;
-  const staleCount = listings.filter((l) => l.domainRating === 0 && l.monthlyTraffic === 0).length;
+  // Metrics refresh themselves every REFRESH_AFTER_DAYS days; this counts what is due now.
+  const cutoff = new Date(Date.now() - REFRESH_AFTER_DAYS * 86400_000);
+  const staleCount = listings.filter(
+    (l) => !l.metricsUpdatedAt || l.metricsUpdatedAt < cutoff
+  ).length;
 
   return (
     <div>
@@ -17,7 +22,7 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
         <div className="flex gap-2">
           {staleCount > 0 && (
             <form action={refreshListingMetricsAction}>
-              <button className="btn-ghost btn-sm" type="submit">Refresh DR &amp; traffic ({staleCount} at 0)</button>
+              <button className="btn-ghost btn-sm" type="submit">Refresh DR &amp; traffic ({staleCount} due)</button>
             </form>
           )}
           {pendingCount > 0 && (
@@ -37,7 +42,12 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
           <tbody>
             {listings.map((l) => (
               <tr key={l.id}>
-                <td className="font-semibold">{l.domain}<div className="muted text-xs">{l.country}</div></td>
+                <td className="font-semibold">
+                  <a href={l.url || `https://${l.domain}`} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-wt-green hover:underline">
+                    {l.domain} ↗
+                  </a>
+                  <div className="muted text-xs">{l.country}</div>
+                </td>
                 <td className="muted">{l.publisher.name}</td>
                 <td>{l.domainRating}</td>
                 <td>{trafficShort(l.monthlyTraffic)}</td>

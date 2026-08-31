@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { appUrl } from "@/lib/stripe";
 import { emailEnabled, sendInviteEmail, sendApplicationRejected } from "@/lib/email";
-import { ahrefsEnabled, fetchDomainMetrics } from "@/lib/ahrefs";
+import { ahrefsEnabled } from "@/lib/ahrefs";
+import { refreshDueMetrics, REFRESH_AFTER_DAYS } from "@/lib/metrics";
 
 const q = (s: string) => encodeURIComponent(s);
 
@@ -78,55 +79,31 @@ export async function approveAllListingsAction() {
 }
 
 /**
- * Backfill DR + monthly traffic for listings that still show 0 (bulk-uploaded rows
- * past the live-fetch cap, or anything added before the Ahrefs key was in place).
- * Runs one batch per click so the request never outlives the load balancer.
+ * Refresh DR + monthly traffic on demand. The app already does this on its own
+ * every 7 days (see lib/metrics-scheduler.ts); this button is for when an admin
+ * does not want to wait - after a big bulk upload, for example.
+ *
+ * One batch per click, so the request never outlives the load balancer.
  */
 export async function refreshListingMetricsAction() {
   await requireRole("admin");
   if (!ahrefsEnabled()) {
-    redirect(`/admin/listings?error=${q("AHREFS_API_KEY is not set on the server, so DR and traffic cannot be fetched.")}`);
+    redirect(`/admin/listings?error=${q("The Ahrefs API key is not set on the server, so DR and traffic cannot be fetched.")}`);
   }
 
-  const PARALLEL = 10;              // simultaneous Ahrefs calls
-  const CANDIDATES = 600;           // how many to pull into memory per click
-  const DEADLINE = Date.now() + 25_000; // stop before the load balancer times out
+  const r = await refreshDueMetrics({ maxItems: 600, budgetMs: 25_000, parallel: 10 });
 
-  const stale = await prisma.listing.findMany({
-    where: { domainRating: 0, monthlyTraffic: 0 },
-    orderBy: { id: "asc" },
-    take: CANDIDATES,
-  });
-  if (stale.length === 0) {
-    redirect(`/admin/listings?success=${q("Every website already has DR and traffic.")}`);
+  if (r.processed === 0) {
+    redirect(`/admin/listings?success=${q("Every website is already up to date.")}`);
   }
 
-  let updated = 0;
-  let failed = 0;
-  for (let i = 0; i < stale.length; i += PARALLEL) {
-    if (Date.now() > DEADLINE) break; // finish this click; the admin clicks again to continue
-    const chunk = stale.slice(i, i + PARALLEL);
-    const results = await Promise.all(chunk.map((l) => fetchDomainMetrics(l.domain)));
-    for (let j = 0; j < chunk.length; j++) {
-      const { dr, traffic, ok } = results[j];
-      // Never overwrite with zeros when Ahrefs did not actually answer.
-      if (!ok) { failed++; continue; }
-      if (dr === 0 && traffic === 0) continue;
-      await prisma.listing.update({
-        where: { id: chunk[j].id },
-        data: { domainRating: dr, monthlyTraffic: traffic },
-      });
-      updated++;
-    }
-  }
-
-  const remaining = await prisma.listing.count({ where: { domainRating: 0, monthlyTraffic: 0 } });
   revalidatePath("/admin/listings");
   revalidatePath("/marketplace");
+  revalidatePath("/");
   const msg =
-    `Refreshed ${updated} website(s).` +
-    (failed ? ` ${failed} could not be reached - check the logs.` : "") +
-    (remaining ? ` ${remaining} still at 0 - click Refresh again to continue.` : " All websites are up to date.");
+    `Refreshed ${r.updated} website(s).` +
+    (r.failed ? ` ${r.failed} could not be reached - they will be retried automatically.` : "") +
+    (r.remaining ? ` ${r.remaining} still to go - click Refresh again to continue.` : " All websites are up to date.");
   redirect(`/admin/listings?success=${q(msg)}`);
 }
 

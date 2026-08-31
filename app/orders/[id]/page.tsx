@@ -95,7 +95,7 @@ export default async function OrderPage({
               <button className="btn-danger" type="submit">Cancel</button>
             </form>
           </div>
-          {!stripeEnabled() && <p className="muted mt-3 text-xs">Card payments activate once Stripe keys are added. You can still pay from wallet.</p>}
+          {!stripeEnabled() && <p className="muted mt-3 text-xs">Please pay from your wallet balance.</p>}
         </div>
       )}
 

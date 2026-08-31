@@ -49,8 +49,9 @@ model Listing {
   category       String   // comma-separated niches
   country        String
   language       String   @default("English")
-  domainRating   Int      @default(0)
-  monthlyTraffic Int      @default(0)
+  domainRating   Int       @default(0)
+  monthlyTraffic Int       @default(0)
+  metricsUpdatedAt DateTime? // last time DR + traffic were fetched from Ahrefs
   linkType       String   @default("guest_post") // guest_post | niche_edit
   priceCents     Int      @default(0) // publisher's price (what they receive), in cents
   tatDays        Int      @default(7)

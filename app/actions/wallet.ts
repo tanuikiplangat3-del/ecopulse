@@ -13,7 +13,7 @@ export async function startTopupAction(formData: FormData) {
   const user = await requireRole("buyer");
   const amountUsd = parseFloat(String(formData.get("amount") || "0"));
   if (!amountUsd || amountUsd < 5) redirect(`/topup?error=${q("Minimum top-up is $5.")}`);
-  if (!stripeEnabled()) redirect(`/topup?error=${q("Card payments are not configured yet.")}`);
+  if (!stripeEnabled()) redirect(`/topup?error=${q("Card top-ups are unavailable right now. Please contact support.")}`);
 
   const cents = centsFromUsd(amountUsd);
   const ref = "top_" + randomBytes(10).toString("hex");

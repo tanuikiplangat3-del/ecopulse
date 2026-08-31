@@ -96,7 +96,7 @@ export async function payWithStripeAction(formData: FormData) {
     redirect(`/orders?error=${q("Order not payable.")}`);
   }
   if (!stripeEnabled()) {
-    redirect(`/orders/${orderId}?error=${q("Card payments are not configured yet. Add Stripe keys or pay from wallet.")}`);
+    redirect(`/orders/${orderId}?error=${q("Card payments are unavailable right now. Please pay from your wallet balance.")}`);
   }
   const ref = "ord_" + randomBytes(10).toString("hex");
   await prisma.stripeTx.create({

@@ -12,6 +12,8 @@ const nextConfig = {
   // Allow buyers to upload a featured image + guest-post document with an order.
   experimental: {
     serverActions: { bodySizeLimit: "12mb" },
+    // Runs instrumentation.ts once on server start (weekly DR + traffic refresh).
+    instrumentationHook: true,
   },
   // Keep the deploy pipeline resilient for non-developer redeploys.
   eslint: { ignoreDuringBuilds: true },

@@ -171,8 +171,10 @@ export async function forgotAction(formData: FormData) {
       await sendOrderNotice(email, "Reset your Ecopulse password", `Open this link to reset your password: <a href="${link}">${link}</a>`);
       redirect(`/login?success=${q("If that email exists, a reset link is on its way.")}`);
     }
-    // Email off: show the link directly (dev convenience)
-    redirect(`/login?success=${q("Reset link (email is off): " + link)}`);
+    // Email sending is off - never print the reset link on screen, since anyone
+    // who typed the address would then be able to take over the account.
+    console.error("[auth] Password reset requested but email is not configured.");
+    redirect(`/login?success=${q("If that email exists, a reset link is on its way.")}`);
   }
   redirect(`/login?success=${q("If that email exists, a reset link is on its way.")}`);
 }

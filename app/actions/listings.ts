@@ -18,7 +18,9 @@ async function makeListing(publisherId: number, data: {
   const domain = data.domain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   const url = (data.url || `https://${domain}`).trim();
   // Auto-fetch DR + monthly traffic from Ahrefs (fails soft to 0).
-  const { dr, traffic } = opts.skipAhrefs ? { dr: 0, traffic: 0 } : await fetchDomainMetrics(domain);
+  const metrics = opts.skipAhrefs ? { dr: 0, traffic: 0, ok: false } : await fetchDomainMetrics(domain);
+  const dr = metrics.dr;
+  const traffic = metrics.traffic;
   return prisma.listing.create({
     data: {
       publisherId,
@@ -29,6 +31,9 @@ async function makeListing(publisherId: number, data: {
       language: data.language || "English",
       domainRating: dr,
       monthlyTraffic: traffic,
+      // Only mark as fetched when Ahrefs actually answered, so the weekly
+      // refresh picks it up straight away if it did not.
+      metricsUpdatedAt: metrics.ok ? new Date() : null,
       linkType: data.linkType || "guest_post",
       priceCents: data.priceCents,
       tatDays: data.tatDays || 7,

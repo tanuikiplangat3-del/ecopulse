@@ -25,7 +25,17 @@ export default async function ListingPage({
       {/* Details */}
       <div className="lg:col-span-2">
         <Link href="/marketplace" className="muted text-sm">← Back to marketplace</Link>
-        <h1 className="h2 mb-1 mt-2">{listing.domain}</h1>
+        <h1 className="h2 mb-1 mt-2 flex flex-wrap items-baseline gap-3">
+          {listing.domain}
+          <a
+            href={listing.url || `https://${listing.domain}`}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="text-sm font-semibold text-wt-green hover:underline"
+          >
+            Visit site ↗
+          </a>
+        </h1>
         <p className="muted mb-5">{listing.country} · {listing.language}</p>
 
         <div className="card mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">

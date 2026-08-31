@@ -31,7 +31,12 @@ export default async function MyListingsPage({ searchParams }: { searchParams: {
             <tbody>
               {listings.map((l) => (
                 <tr key={l.id}>
-                  <td className="font-semibold">{l.domain}<div className="muted text-xs">{l.country}</div></td>
+                  <td className="font-semibold">
+                    <a href={l.url || `https://${l.domain}`} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-wt-green hover:underline">
+                      {l.domain} ↗
+                    </a>
+                    <div className="muted text-xs">{l.country}</div>
+                  </td>
                   <td>{l.domainRating}</td>
                   <td>{trafficShort(l.monthlyTraffic)}</td>
                   <td>{money(l.priceCents)}</td>
