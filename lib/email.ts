@@ -33,7 +33,7 @@ function esc(s: string): string {
 /** Chat / contact form -> the SEO desk inbox, with the visitor set as reply-to. */
 export function sendContactEmail(input: { name: string; email: string; message: string }) {
   return send(
-    "seo@welcometomorrow.io",
+    ADMIN_NOTIFY,
     `New chat message from ${input.name}`,
     wrap(
       "New message from the Ecopulse chat",
@@ -137,6 +137,105 @@ export function sendBuyerSignupAdmin(name: string, email: string) {
       "New buyer account",
       `<p>A new buyer just created an account:</p>
        <p><strong>Name:</strong> ${esc(name)}<br><strong>Email:</strong> ${esc(email)}</p>`
+    )
+  );
+}
+
+/** A publisher accepted their invite -> welcome them. */
+export function sendPublisherWelcome(to: string, name: string) {
+  return send(
+    to,
+    "Your publisher account is ready - Welcome Tomorrow Ecopulse",
+    wrap(
+      "Welcome aboard",
+      `<p>Hi ${esc(name)}, your publisher account is active.</p>
+       <p>Add the websites you want to list, then set your payment details so we can pay you.</p>
+       <p>Payouts are made weekly on <strong>Tuesday</strong> for every order marked complete.</p>`
+    )
+  );
+}
+
+/** A publisher joined -> notify the admin desk. */
+export function sendPublisherSignupAdmin(name: string, email: string) {
+  return send(
+    ADMIN_NOTIFY,
+    "New publisher joined",
+    wrap(
+      "New publisher account",
+      `<p>A publisher accepted their invite and created an account:</p>
+       <p><strong>Name:</strong> ${esc(name)}<br><strong>Email:</strong> ${esc(email)}</p>`
+    )
+  );
+}
+
+/** A new admin joined -> notify the admin desk so it is never a surprise. */
+export function sendAdminSignupAdmin(name: string, email: string) {
+  return send(
+    ADMIN_NOTIFY,
+    "New admin account created",
+    wrap(
+      "New admin account",
+      `<p>A new <strong>admin</strong> account was created from an admin invite link:</p>
+       <p><strong>Name:</strong> ${esc(name)}<br><strong>Email:</strong> ${esc(email)}</p>
+       <p>If you did not expect this, revoke the invite and remove the account immediately.</p>`
+    )
+  );
+}
+
+/** Invite someone to become an admin. */
+export function sendAdminInviteEmail(to: string, link: string) {
+  return send(
+    to,
+    "You've been invited as an admin on Welcome Tomorrow Ecopulse",
+    wrap(
+      "You're invited as an admin",
+      `<p>You've been given admin access to the Welcome Tomorrow Ecopulse marketplace.</p>
+       <p><a href="${link}" style="display:inline-block;background:#0aa865;color:#fff;padding:14px 28px;border-radius:30px;text-decoration:none;font-weight:700">Set up your admin account</a></p>
+       <p style="color:rgba(255,255,255,.6)">This link expires in 7 days. Do not forward it - anyone who opens it gets full admin access.</p>`
+    )
+  );
+}
+
+/** Publisher submitted a live URL -> notify the admin desk. */
+export function sendLiveUrlAdmin(orderId: number, domain: string, liveUrl: string) {
+  return send(
+    ADMIN_NOTIFY,
+    `Link went live on ${domain} (order #${orderId})`,
+    wrap(
+      "A link just went live",
+      `<p>The publisher submitted the live URL for order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong>.</p>
+       <p><a href="${liveUrl}" style="color:#0aa865">${esc(liveUrl)}</a></p>
+       <p>The buyer has been asked to confirm. Once complete, pay the publisher from the admin Orders page.</p>`
+    )
+  );
+}
+
+/** A buyer deposit cleared -> notify the admin desk (the buyer gets their own receipt). */
+export function sendDepositAdmin(buyerEmail: string, grossCents: number, netCents: number) {
+  return send(
+    ADMIN_NOTIFY,
+    "New deposit received",
+    wrap(
+      "New deposit",
+      `<p>A buyer topped up their wallet:</p>
+       <p><strong>Buyer:</strong> ${esc(buyerEmail)}<br>
+          <strong>Deposited:</strong> ${money(grossCents)}<br>
+          <strong>Credited after the 5% service fee:</strong> ${money(netCents)}</p>
+       <p>Remember to send their invoice within 24 hours.</p>`
+    )
+  );
+}
+
+/** Publisher payout approved -> tell the publisher. */
+export function sendPublisherPaid(to: string, orderId: number, domain: string) {
+  return send(
+    to,
+    `Payment approved for order #${orderId}`,
+    wrap(
+      "Your payment has been approved",
+      `<p>Your payment for order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong> has been approved.</p>
+       <p>It will be sent to your saved payment details on the next <strong>Tuesday</strong> payout run.</p>
+       <p>If anything looks wrong, reply to this email and we will sort it out.</p>`
     )
   );
 }

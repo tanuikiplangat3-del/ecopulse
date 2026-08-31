@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
-import { emailEnabled, sendOrderNotice, sendDepositReceipt } from "@/lib/email";
+import { emailEnabled, sendOrderNotice, sendDepositReceipt, sendDepositAdmin } from "@/lib/email";
 import { netDeposit } from "@/lib/money";
 
 // Stripe needs the raw body to verify the signature.
@@ -68,7 +68,10 @@ export async function POST(req: NextRequest) {
           ]);
           if (emailEnabled()) {
             const u = await prisma.user.findUnique({ where: { id: tx.userId } });
-            if (u) await sendDepositReceipt(u.email, tx.amountCents, net);
+            if (u) {
+              await sendDepositReceipt(u.email, tx.amountCents, net);
+              await sendDepositAdmin(u.email, tx.amountCents, net);
+            }
           }
         }
       }

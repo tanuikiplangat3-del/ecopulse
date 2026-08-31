@@ -14,11 +14,12 @@ export default async function AcceptInvitePage({
   const token = one(searchParams.token);
   const invite = token ? await prisma.invite.findUnique({ where: { token } }) : null;
   const valid = invite && !invite.acceptedAt && invite.expiresAt > new Date();
+  const isAdminInvite = invite?.role === "admin";
 
   return (
     <div className="mx-auto max-w-md">
       <div className="card">
-        <h1 className="h2 mb-1">Become a publisher</h1>
+        <h1 className="h2 mb-1">{isAdminInvite ? "Set up your admin account" : "Become a publisher"}</h1>
         <Flash searchParams={searchParams} />
         {!valid ? (
           <p className="flash flash-error">
@@ -27,7 +28,9 @@ export default async function AcceptInvitePage({
         ) : (
           <>
             <p className="muted mb-5">
-              Set up your publisher account, then add the website or websites you want to list.
+              {isAdminInvite
+                ? "You have been invited as an admin. Choose a name and password to finish setting up your account."
+                : "Set up your publisher account, then add the website or websites you want to list."}
             </p>
             <form action={acceptInviteAction}>
               <input type="hidden" name="token" value={token} />
@@ -48,30 +51,34 @@ export default async function AcceptInvitePage({
               </label>
               <NewPasswordFields />
 
-              <fieldset className="field">
-                <span>How many websites do you want to list?</span>
-                <div className="mt-2 grid gap-2">
-                  <label className="flex items-center gap-2 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
-                    <input type="radio" name="sites" value="single" defaultChecked /> I have one website (add it on the next step)
-                  </label>
-                  <label className="flex items-center gap-2 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
-                    <input type="radio" name="sites" value="multiple" /> I have multiple websites (upload a spreadsheet)
-                  </label>
-                </div>
-              </fieldset>
+              {!isAdminInvite && (
+                <>
+                  <fieldset className="field">
+                    <span>How many websites do you want to list?</span>
+                    <div className="mt-2 grid gap-2">
+                      <label className="flex items-center gap-2 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
+                        <input type="radio" name="sites" value="single" defaultChecked /> I have one website (add it on the next step)
+                      </label>
+                      <label className="flex items-center gap-2 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
+                        <input type="radio" name="sites" value="multiple" /> I have multiple websites (upload a spreadsheet)
+                      </label>
+                    </div>
+                  </fieldset>
 
-              <label className="mt-2 flex items-start gap-3 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
-                <input type="checkbox" name="agreeTuesday" className="mt-1" required />
-                <span>
-                  I understand and agree that all payments for all orders are paid weekly on
-                  <strong> Tuesday</strong>. If a payment is not received by then, I will contact
-                  seo@welcometomorrow.io to resolve it. I understand my site will not be listed if
-                  I do not agree.
-                </span>
-              </label>
+                  <label className="mt-2 flex items-start gap-3 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
+                    <input type="checkbox" name="agreeTuesday" className="mt-1" required />
+                    <span>
+                      I understand and agree that all payments for all orders are paid weekly on
+                      <strong> Tuesday</strong>. If a payment is not received by then, I will contact
+                      seo@welcometomorrow.io to resolve it. I understand my site will not be listed if
+                      I do not agree.
+                    </span>
+                  </label>
+                </>
+              )}
 
               <button className="btn-primary mt-4 w-full" type="submit">
-                Create my publisher account
+                {isAdminInvite ? "Create my admin account" : "Create my publisher account"}
               </button>
             </form>
           </>

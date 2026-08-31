@@ -3,7 +3,14 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword, createSession, destroySession } from "@/lib/auth";
-import { emailEnabled, sendVerificationCodeEmail, sendBuyerSignupAdmin } from "@/lib/email";
+import {
+  emailEnabled,
+  sendVerificationCodeEmail,
+  sendBuyerSignupAdmin,
+  sendPublisherWelcome,
+  sendPublisherSignupAdmin,
+  sendAdminSignupAdmin,
+} from "@/lib/email";
 import { appUrl } from "@/lib/stripe";
 import { passwordProblem } from "@/lib/password";
 import { randomBytes, randomInt } from "crypto";
@@ -206,9 +213,11 @@ export async function acceptInviteAction(formData: FormData) {
   if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
     redirect(`/accept-invite?token=${q(token)}&error=${q("This invite is invalid or has expired.")}`);
   }
+  // The invite decides the role - never the form, which the visitor controls.
+  const isAdminInvite = invite!.role === "admin";
   const email = (String(formData.get("email") || "") || invite!.email || "").trim().toLowerCase();
   if (!name) redirect(`/accept-invite?token=${q(token)}&error=${q("Please enter your name.")}`);
-  if (!agreedTuesday)
+  if (!isAdminInvite && !agreedTuesday)
     redirect(`/accept-invite?token=${q(token)}&error=${q("You must agree that payouts are made every Tuesday to be listed.")}`);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     redirect(`/accept-invite?token=${q(token)}&error=${q("Enter a valid email address.")}`);
@@ -227,13 +236,24 @@ export async function acceptInviteAction(formData: FormData) {
       name,
       email,
       passwordHash: await hashPassword(password),
-      role: "publisher",
+      role: isAdminInvite ? "admin" : "publisher",
       verified: true,
-      tuesdayAgreed: true,
+      tuesdayAgreed: !isAdminInvite,
     },
   });
   await prisma.invite.update({ where: { token }, data: { acceptedAt: new Date() } });
+
+  if (emailEnabled()) {
+    if (isAdminInvite) {
+      await sendAdminSignupAdmin(name, email);
+    } else {
+      await sendPublisherWelcome(email, name);
+      await sendPublisherSignupAdmin(name, email);
+    }
+  }
+
   await createSession(user.id);
+  if (isAdminInvite) redirect(`/admin?success=${q("Welcome. Your admin account is ready.")}`);
   // Send them straight to add their site(s), then payment details.
   redirect(sites === "multiple" ? "/bulk-upload?first=1" : "/new-listing?first=1");
 }

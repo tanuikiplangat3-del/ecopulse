@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, requireUser } from "@/lib/auth";
 import { buyerPrice, commissionRate } from "@/lib/money";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
-import { emailEnabled, sendOrderNotice, sendNewOrderEmails } from "@/lib/email";
+import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin } from "@/lib/email";
 
 const q = (s: string) => encodeURIComponent(s);
 
@@ -125,8 +125,11 @@ export async function submitLiveAction(formData: FormData) {
   if (!/^https?:\/\//.test(liveUrl)) redirect(`/orders/${orderId}?error=${q("Enter a valid live URL.")}`);
 
   await prisma.order.update({ where: { id: orderId }, data: { status: "live", liveUrl } });
-  if (emailEnabled() && order!.buyer) {
-    await sendOrderNotice(order!.buyer.email, "Your link is live", `The publisher submitted the live URL for order #${orderId}: ${liveUrl}. Please confirm in your dashboard.`);
+  if (emailEnabled()) {
+    if (order!.buyer) {
+      await sendOrderNotice(order!.buyer.email, "Your link is live", `The publisher submitted the live URL for order #${orderId}: ${liveUrl}. Please confirm in your dashboard.`);
+    }
+    await sendLiveUrlAdmin(orderId, order!.listing.domain, liveUrl);
   }
   revalidatePath("/orders");
   redirect(`/orders/${orderId}?success=${q("Live URL submitted. Waiting for buyer confirmation.")}`);

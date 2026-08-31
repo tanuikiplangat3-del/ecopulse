@@ -6,7 +6,13 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { appUrl } from "@/lib/stripe";
-import { emailEnabled, sendInviteEmail, sendApplicationRejected } from "@/lib/email";
+import {
+  emailEnabled,
+  sendInviteEmail,
+  sendApplicationRejected,
+  sendAdminInviteEmail,
+  sendPublisherPaid,
+} from "@/lib/email";
 import { ahrefsEnabled } from "@/lib/ahrefs";
 import { refreshDueMetrics, REFRESH_AFTER_DAYS } from "@/lib/metrics";
 
@@ -44,6 +50,32 @@ export async function createShareInviteAction() {
   });
   const link = `${appUrl()}/accept-invite?token=${token}`;
   redirect(`/admin/invites?success=${q("Shareable invite link created. Send it to your publisher: " + link)}`);
+}
+
+/**
+ * Invite another admin by email. Admin invites grant full access, so they are
+ * always tied to one address and are never shareable links.
+ */
+export async function inviteAdminAction(formData: FormData) {
+  await requireRole("admin");
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+    redirect(`/admin/invites?error=${q("Enter a valid email address for the new admin.")}`);
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) redirect(`/admin/invites?error=${q("A user with that email already exists.")}`);
+
+  const token = randomBytes(24).toString("hex");
+  await prisma.invite.create({
+    data: { email, token, role: "admin", expiresAt: new Date(Date.now() + 7 * 86400_000) },
+  });
+  const link = `${appUrl()}/accept-invite?token=${token}`;
+
+  if (emailEnabled()) {
+    await sendAdminInviteEmail(email, link);
+    redirect(`/admin/invites?success=${q("Admin invite sent to " + email)}`);
+  }
+  redirect(`/admin/invites?success=${q("Admin invite created. Share this link only with " + email + ": " + link)}`);
 }
 
 export async function revokeInviteAction(formData: FormData) {
@@ -169,6 +201,17 @@ export async function markPublisherPaidAction(formData: FormData) {
     where: { id: orderId },
     data: { publisherPaid: true, status: "completed" },
   });
+
+  // Tell the publisher their payment was approved.
+  if (emailEnabled()) {
+    const full = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { listing: { include: { publisher: true } } },
+    });
+    const pub = full?.listing.publisher;
+    if (pub) await sendPublisherPaid(pub.email, orderId, full!.listing.domain);
+  }
+
   revalidatePath("/admin/orders");
   redirect(`/admin/orders?success=${q("Publisher marked as paid. Buyer hold released.")}`);
 }
