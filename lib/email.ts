@@ -46,8 +46,18 @@ export function sendContactEmail(input: { name: string; email: string; message: 
   );
 }
 
+/**
+ * The Welcome Tomorrow mark, served from the app's own public folder so it has a
+ * stable absolute URL. Email clients cannot load relative paths, and many block
+ * remote images until the reader allows them - hence the alt text.
+ */
+const logoUrl = (): string =>
+  `${(process.env.APP_URL || "https://tools.welcometomorrow.io/linktomorrow").replace(/\/$/, "")}/email-logo.png`;
+
 const wrap = (title: string, body: string) => `
   <div style="font-family:Outfit,Arial,sans-serif;background:#000;color:#fff;padding:32px;border-radius:20px">
+    <img src="${logoUrl()}" width="52" height="52" alt="Welcome Tomorrow"
+         style="display:block;border:0;outline:none;text-decoration:none;border-radius:12px;margin:0 0 20px" />
     <h1 style="color:#0aa865;margin:0 0 16px">${title}</h1>
     <div style="font-size:16px;line-height:1.5;color:#fff">${body}</div>
     <p style="color:rgba(255,255,255,.6);font-size:13px;margin-top:24px">Link Tomorrow - Link Building Marketplace</p>
