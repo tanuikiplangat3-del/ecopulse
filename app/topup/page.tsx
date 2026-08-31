@@ -21,15 +21,11 @@ export default async function TopupPage({ searchParams }: { searchParams: { [key
         <form action={startTopupAction} className="flex items-end gap-3">
           <label className="field mb-0 flex-1">
             <span>Amount (USD)</span>
-            <input className="input" name="amount" type="number" min="5" step="1" placeholder="50" required />
+            <input className="input" name="amount" type="number" min="50" step="1" placeholder="50" required />
           </label>
           <button className="btn-primary" type="submit" disabled={!stripeEnabled()}>Top up</button>
         </form>
-        <p className="muted mt-3 text-xs">
-          Your full deposit is added to your balance &mdash; no deposit fee. Balance amounts are
-          exclusive of VAT and service fees; both are already included in the price shown on each
-          website, so nothing further is deducted from your balance.
-        </p>
+        <p className="muted mt-3 text-xs">Minimum deposit $50.</p>
       </div>
 
       {txs.length > 0 && (

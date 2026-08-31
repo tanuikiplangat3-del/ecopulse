@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, requireUser } from "@/lib/auth";
 import { buyerPrice, commissionRate } from "@/lib/money";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
-import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin } from "@/lib/email";
+import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin, sendOrderConfirmedEmails } from "@/lib/email";
 
 const q = (s: string) => encodeURIComponent(s);
 
@@ -142,6 +142,7 @@ export async function confirmLiveAction(formData: FormData) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order || order.buyerId !== user.id || order.status !== "live") redirect(`/orders?error=${q("Cannot confirm this order.")}`);
   await prisma.order.update({ where: { id: orderId }, data: { status: "completed" } });
+  await notifyOrderConfirmed(orderId);
   revalidatePath("/orders");
   redirect(`/orders/${orderId}?success=${q("Order completed. Thank you!")}`);
 }
@@ -157,6 +158,7 @@ export async function adminConfirmLiveAction(formData: FormData) {
   if (emailEnabled() && order!.buyer) {
     await sendOrderNotice(order!.buyer.email, "Your order is complete", `Order #${orderId} has been confirmed live and marked complete.`);
   }
+  await notifyOrderConfirmed(orderId);
   revalidatePath("/admin/orders");
   redirect(`/admin/orders?success=${q("Order confirmed live.")}`);
 }
@@ -170,6 +172,24 @@ export async function cancelOrderAction(formData: FormData) {
   if (!canCancel) redirect(`/orders/${orderId}?error=${q("This order can no longer be cancelled.")}`);
   await prisma.order.update({ where: { id: orderId }, data: { status: "cancelled" } });
   redirect(`/orders/${orderId}?success=${q("Order cancelled.")}`);
+}
+
+/** Order completed -> tell the publisher and the admin desk (starts the 72h clock). */
+async function notifyOrderConfirmed(orderId: number) {
+  if (!emailEnabled()) return;
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { listing: { include: { publisher: true } } },
+  });
+  const pub = order?.listing.publisher;
+  if (pub) {
+    await sendOrderConfirmedEmails({
+      publisherEmail: pub.email,
+      domain: order!.listing.domain,
+      orderId,
+      payoutCents: order!.payoutCents,
+    });
+  }
 }
 
 async function notifyPublisherFunded(orderId: number) {

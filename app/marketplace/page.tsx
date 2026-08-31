@@ -6,7 +6,7 @@ import ListingCard from "@/components/ListingCard";
 import SearchSelect from "@/components/SearchSelect";
 import { Flash } from "@/components/ui";
 import { NICHES, COUNTRIES, LANGUAGES } from "@/lib/data";
-import { centsFromUsd, filterFloorFromBuyer, filterCeilingFromBuyer, money, UNLOCK_DEPOSIT_CENTS } from "@/lib/money";
+import { centsFromUsd, filterFloorFromBuyer, filterCeilingFromBuyer } from "@/lib/money";
 import { getViewerAccess, maskListing, FREE_PREVIEW_COUNT } from "@/lib/access";
 import { one } from "@/lib/util";
 
@@ -144,21 +144,12 @@ export default async function MarketplacePage({
 
           {lockedCount > 0 && (
             <div className="card mt-6 text-center">
-              <h2 className="h3 mb-2">Unlock the full marketplace</h2>
-              <p className="muted mx-auto mb-5 max-w-measure">
-                You are seeing the first {FREE_PREVIEW_COUNT} sites.{" "}
-                {access.signedIn
-                  ? `Add ${money(access.shortfallCents)} to your wallet to reveal every site, with full domains, DR and traffic.`
-                  : `Create a free account and top up ${money(UNLOCK_DEPOSIT_CENTS)} to reveal every site, with full domains, DR and traffic.`}
-              </p>
+              <h2 className="h3 mb-5">Top up to explore more</h2>
               {access.signedIn ? (
                 <Link href="/topup" className="btn-primary">Top up my wallet</Link>
               ) : (
                 <Link href="/register" className="btn-primary">Create a free account</Link>
               )}
-              <p className="muted mt-4 text-xs">
-                Your deposit is not a fee - it stays in your wallet and pays for the placements you order.
-              </p>
             </div>
           )}
         </>

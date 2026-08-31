@@ -33,6 +33,9 @@ export function netDeposit(grossCents: number): number {
  */
 export const UNLOCK_DEPOSIT_CENTS = 5000; // $50
 
+/** Smallest wallet top-up allowed. Matches the amount that unlocks the marketplace. */
+export const MIN_TOPUP_CENTS = UNLOCK_DEPOSIT_CENTS;
+
 /** Free listings every visitor can see before the paywall applies. */
 export const FREE_PREVIEW_COUNT = 10;
 

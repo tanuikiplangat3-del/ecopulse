@@ -12,6 +12,8 @@ import {
   sendApplicationRejected,
   sendAdminInviteEmail,
   sendPublisherPaid,
+  sendTestEmail,
+  ADMIN_NOTIFY,
 } from "@/lib/email";
 import { ahrefsEnabled } from "@/lib/ahrefs";
 import { refreshDueMetrics, REFRESH_AFTER_DAYS } from "@/lib/metrics";
@@ -137,6 +139,24 @@ export async function refreshListingMetricsAction() {
     (r.failed ? ` ${r.failed} could not be reached - they will be retried automatically.` : "") +
     (r.remaining ? ` ${r.remaining} still to go - click Refresh again to continue.` : " All websites are up to date.");
   redirect(`/admin/listings?success=${q(msg)}`);
+}
+
+/**
+ * Send a test email to the admin desk. Lets an admin prove the email layer works
+ * without having to take a real payment first, and reports the exact reason when
+ * it does not - the Resend API rejects messages without throwing, so a failure
+ * here is the quickest way to see why nothing is arriving.
+ */
+export async function sendTestEmailAction() {
+  await requireRole("admin");
+  if (!emailEnabled()) {
+    redirect(`/admin?error=${q("RESEND_API_KEY is not set on the server, so no email can be sent.")}`);
+  }
+  const ok = await sendTestEmail();
+  if (ok) {
+    redirect(`/admin?success=${q("Test email sent to " + ADMIN_NOTIFY + ". If it does not arrive, check the sending domain in Resend.")}`);
+  }
+  redirect(`/admin?error=${q("Resend rejected the message. Check the container logs for a line starting [email] REJECTED - it names the reason.")}`);
 }
 
 /** Super admin: permanently delete any user (and their sites/orders via cascade). */

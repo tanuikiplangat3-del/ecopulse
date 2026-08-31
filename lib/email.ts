@@ -11,12 +11,25 @@ export const ADMIN_NOTIFY = process.env.ADMIN_NOTIFY_EMAIL || "seo@welcometomorr
 export const emailEnabled = (): boolean => !!resend;
 
 async function send(to: string, subject: string, html: string, replyTo?: string): Promise<boolean> {
-  if (!resend) return false;
+  if (!resend) {
+    console.error(`[email] RESEND_API_KEY is not set - "${subject}" to ${to} was not sent.`);
+    return false;
+  }
   try {
-    await resend.emails.send({ from, to, subject, html, replyTo });
+    // The Resend SDK does NOT throw when the API rejects a message; it returns
+    // { data, error }. Checking only for thrown exceptions reported every
+    // rejection as a success, which is why failures were invisible.
+    const res: any = await resend.emails.send({ from, to, subject, html, replyTo });
+    if (res?.error) {
+      console.error(
+        `[email] REJECTED "${subject}" to ${to} from "${from}": ${res.error.name || ""} ${res.error.message || JSON.stringify(res.error)}`
+      );
+      return false;
+    }
+    console.log(`[email] sent "${subject}" to ${to} (id ${res?.data?.id || "unknown"})`);
     return true;
-  } catch (e) {
-    console.error("Email send failed:", e);
+  } catch (e: any) {
+    console.error(`[email] FAILED "${subject}" to ${to}: ${e?.message || e}`);
     return false;
   }
 }
@@ -103,7 +116,6 @@ export function sendDepositReceipt(to: string, grossCents: number, netCents: num
       "Deposit received",
       `<p>We have received your deposit of <strong>${money(grossCents)}</strong>.</p>
        <p>The full <strong>${money(netCents)}</strong> has been added to your wallet balance and is ready to use.</p>
-       <p style="color:rgba(255,255,255,.6)">Balance amounts are shown exclusive of VAT and service fees. Both are already included in the price shown on each website, so nothing further is deducted from your balance.</p>
        <p>Your invoice will be emailed to you within 24 hours.</p>`
     )
   );
@@ -135,6 +147,41 @@ export async function sendNewOrderEmails(input: {
         input.buyerName ? ` by ${esc(input.buyerName)}` : ""
       }.</p>
        <p>Follow up from the admin Orders page.</p>`
+    )
+  );
+}
+
+/**
+ * Buyer confirmed the link is live -> tell the publisher and the admin desk.
+ * This is the moment the 72-hour payment clock starts, so both sides need it:
+ * the publisher to know payment is coming, the admin to know to release it.
+ */
+export async function sendOrderConfirmedEmails(input: {
+  publisherEmail: string;
+  domain: string;
+  orderId: number;
+  payoutCents: number;
+}) {
+  const { publisherEmail, domain, orderId, payoutCents } = input;
+  await send(
+    publisherEmail,
+    `Buyer confirmed order #${orderId} - payment on the way`,
+    wrap(
+      "Your link was confirmed",
+      `<p>The buyer has confirmed that your link on <strong>${esc(domain)}</strong> is live, and order
+          <strong>#${orderId}</strong> is now complete.</p>
+       <p>Your payment of <strong>${money(payoutCents)}</strong> will be released within
+          <strong>72 hours</strong> to your saved payment details.</p>`
+    )
+  );
+  await send(
+    ADMIN_NOTIFY,
+    `ACTION: release payment for order #${orderId} (${domain})`,
+    wrap(
+      "Payment due within 72 hours",
+      `<p>The buyer confirmed order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong> is live.</p>
+       <p>Publisher payout: <strong>${money(payoutCents)}</strong> to ${esc(publisherEmail)}.</p>
+       <p>The 72-hour payment window starts now. Release it from the admin Orders page.</p>`
     )
   );
 }
@@ -247,6 +294,22 @@ export function sendPublisherPaid(to: string, orderId: number, domain: string) {
       `<p>Your payment for order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong> has been approved.</p>
        <p>It will be sent to your saved payment details within <strong>72 hours</strong>.</p>
        <p>If anything looks wrong, reply to this email and we will sort it out.</p>`
+    )
+  );
+}
+
+/** A one-off test message, so an admin can prove email works without a payment. */
+export function sendTestEmail() {
+  return send(
+    ADMIN_NOTIFY,
+    "Link Tomorrow test email",
+    wrap(
+      "Email is working",
+      `<p>This is a test message sent from the admin dashboard.</p>
+       <p>If you are reading this, the sending key and domain are set up correctly, and every
+          notification - deposits, orders, signups and confirmation codes - will reach you the
+          same way.</p>
+       <p style="color:rgba(255,255,255,.6)">Sent ${new Date().toUTCString()}</p>`
     )
   );
 }

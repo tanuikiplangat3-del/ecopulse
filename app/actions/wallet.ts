@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-import { centsFromUsd } from "@/lib/money";
+import { centsFromUsd, money, MIN_TOPUP_CENTS } from "@/lib/money";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
 
 const q = (s: string) => encodeURIComponent(s);
@@ -12,7 +12,8 @@ const q = (s: string) => encodeURIComponent(s);
 export async function startTopupAction(formData: FormData) {
   const user = await requireRole("buyer");
   const amountUsd = parseFloat(String(formData.get("amount") || "0"));
-  if (!amountUsd || amountUsd < 5) redirect(`/topup?error=${q("Minimum top-up is $5.")}`);
+  if (!amountUsd || centsFromUsd(amountUsd) < MIN_TOPUP_CENTS)
+    redirect(`/topup?error=${q("The minimum deposit is " + money(MIN_TOPUP_CENTS) + ".")}`);
   if (!stripeEnabled()) redirect(`/topup?error=${q("Card top-ups are unavailable right now. Please contact support.")}`);
 
   const cents = centsFromUsd(amountUsd);
