@@ -57,25 +57,31 @@ export async function POST(req: NextRequest) {
           const order = await prisma.order.findUnique({ where: { id: tx.orderId } });
           if (order && order.status === "pending_payment") {
             await prisma.order.update({ where: { id: tx.orderId }, data: { status: "funded" } });
-            if (emailEnabled()) {
-              const full = await prisma.order.findUnique({
-                where: { id: tx.orderId },
-                include: { listing: { include: { publisher: true } }, buyer: true },
-              });
-              const pub = full?.listing.publisher;
-              // Use the same helper the wallet path uses, so a card-funded order
-              // notifies BOTH the publisher and the admin desk. Previously this
-              // branch told only the publisher, so admins missed card orders.
-              if (pub) {
-                await sendNewOrderEmails({
-                  publisherEmail: pub.email,
-                  domain: full!.listing.domain,
-                  orderId: tx.orderId,
-                  buyerName: full!.buyer?.name,
+            // Same reasoning as the deposit branch: the order is funded, so a
+            // notification failure must never bubble up and cost us the emails.
+            try {
+              if (emailEnabled()) {
+                const full = await prisma.order.findUnique({
+                  where: { id: tx.orderId },
+                  include: { listing: { include: { publisher: true } }, buyer: true },
                 });
-              } else {
-                console.error(`[stripe-webhook] order ${tx.orderId} has no publisher - no order emails sent.`);
+                const pub = full?.listing.publisher;
+                // Use the same helper the wallet path uses, so a card-funded order
+                // notifies BOTH the publisher and the admin desk. Previously this
+                // branch told only the publisher, so admins missed card orders.
+                if (pub) {
+                  await sendNewOrderEmails({
+                    publisherEmail: pub.email,
+                    domain: full!.listing.domain,
+                    orderId: tx.orderId,
+                    buyerName: full!.buyer?.name,
+                  });
+                } else {
+                  console.error(`[stripe-webhook] order ${tx.orderId} has no publisher - no order emails sent.`);
+                }
               }
+            } catch (e: any) {
+              console.error(`[stripe-webhook] order emails failed for order ${tx.orderId}: ${e?.message || e}`);
             }
           }
         } else if (tx.purpose === "topup") {
@@ -95,16 +101,24 @@ export async function POST(req: NextRequest) {
             }),
           ]);
           console.log(`[stripe-webhook] credited ${net} cents to user ${tx.userId}`);
-          if (!emailEnabled()) {
-            console.error("[stripe-webhook] email is off - deposit receipt and admin alert were not sent.");
-          } else {
-            const u = await prisma.user.findUnique({ where: { id: tx.userId } });
-            if (!u) {
-              console.error(`[stripe-webhook] user ${tx.userId} not found - no deposit emails sent.`);
+          // The money is already banked at this point. Never let a notification
+          // problem - a dropped database connection, a rejected email - throw out
+          // of the handler: Stripe would see a 500, retry, find the transaction
+          // already marked success, and skip. The emails would be lost for good.
+          try {
+            if (!emailEnabled()) {
+              console.error("[stripe-webhook] email is off - deposit receipt and admin alert were not sent.");
             } else {
-              await sendDepositReceipt(u.email, tx.amountCents, net);
-              await sendDepositAdmin(u.email, tx.amountCents, net);
+              const u = await prisma.user.findUnique({ where: { id: tx.userId } });
+              if (!u) {
+                console.error(`[stripe-webhook] user ${tx.userId} not found - no deposit emails sent.`);
+              } else {
+                await sendDepositReceipt(u.email, tx.amountCents, net);
+                await sendDepositAdmin(u.email, tx.amountCents, net);
+              }
             }
+          } catch (e: any) {
+            console.error(`[stripe-webhook] deposit emails failed for user ${tx.userId}: ${e?.message || e}`);
           }
         }
       }
