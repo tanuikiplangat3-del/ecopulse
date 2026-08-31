@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { acceptInviteAction } from "@/app/actions/auth";
 import { Flash } from "@/components/ui";
+import { NewPasswordFields } from "@/components/PasswordField";
 import { one } from "@/lib/util";
 
 export const metadata = { title: "Publisher invite", robots: { index: false } };
@@ -45,11 +46,7 @@ export default async function AcceptInvitePage({
                   autoComplete="email"
                 />
               </label>
-              <label className="field">
-                <span>Choose a password</span>
-                <input className="input" type="password" name="password" required minLength={8} autoComplete="new-password" />
-                <small className="muted">At least 8 characters.</small>
-              </label>
+              <NewPasswordFields />
 
               <fieldset className="field">
                 <span>How many websites do you want to list?</span>

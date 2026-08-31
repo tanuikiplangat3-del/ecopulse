@@ -19,7 +19,8 @@ export default async function BulkUploadPage({
       <h1 className="h2 mb-1">Upload your websites</h1>
       <p className="muted mb-6">
         Upload a CSV or Excel file and each row becomes a website, exactly as if you added
-        it one by one. Domain Rating and monthly traffic are pulled from Ahrefs automatically.
+        it one by one. You can upload up to 1,000 websites in a single file. Domain Rating
+        and monthly traffic are pulled from Ahrefs and appear shortly after the upload.
       </p>
       <Flash searchParams={searchParams} />
 

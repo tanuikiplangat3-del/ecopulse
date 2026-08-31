@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { loginAction } from "@/app/actions/auth";
 import { Flash } from "@/components/ui";
+import { PasswordInput } from "@/components/PasswordField";
 
 export default function LoginPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   return (
@@ -14,10 +15,7 @@ export default function LoginPage({ searchParams }: { searchParams: { [key: stri
             <span>Email</span>
             <input className="input" type="email" name="email" required autoComplete="email" />
           </label>
-          <label className="field">
-            <span>Password</span>
-            <input className="input" type="password" name="password" required autoComplete="current-password" />
-          </label>
+          <PasswordInput />
           <button className="btn-primary w-full" type="submit">
             Sign in
           </button>

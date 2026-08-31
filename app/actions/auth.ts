@@ -3,12 +3,34 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword, createSession, destroySession } from "@/lib/auth";
-import { emailEnabled, sendVerificationEmail, sendBuyerSignupAdmin } from "@/lib/email";
+import { emailEnabled, sendVerificationCodeEmail, sendBuyerSignupAdmin } from "@/lib/email";
 import { appUrl } from "@/lib/stripe";
-import { randomBytes } from "crypto";
+import { passwordProblem } from "@/lib/password";
+import { randomBytes, randomInt } from "crypto";
 
 function q(s: string) {
   return encodeURIComponent(s);
+}
+
+/** A cryptographically random 6-digit code, always 6 characters. */
+function sixDigitCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
+/** Issue (or re-issue) a confirmation code for a user and email it to them. */
+async function issueVerificationCode(userId: number, email: string): Promise<boolean> {
+  const code = sixDigitCode();
+  await prisma.emailVerification.deleteMany({ where: { userId } });
+  await prisma.emailVerification.create({
+    data: {
+      token: randomBytes(24).toString("hex"),
+      userId,
+      code,
+      attempts: 0,
+      expiresAt: new Date(Date.now() + 15 * 60_000), // 15 minutes
+    },
+  });
+  return sendVerificationCodeEmail(email, code);
 }
 
 /** Public registration - BUYERS ONLY. Publishers are invite-only. */
@@ -16,12 +38,15 @@ export async function registerAction(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
+  const confirmPassword = String(formData.get("confirmPassword") || "");
 
   if (!name) redirect(`/register?error=${q("Please enter your name.")}`);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     redirect(`/register?error=${q("Enter a valid email address.")}`);
-  if (password.length < 8)
-    redirect(`/register?error=${q("Password must be at least 8 characters.")}`);
+  const pwProblem = passwordProblem(password);
+  if (pwProblem) redirect(`/register?error=${q(pwProblem)}`);
+  if (password !== confirmPassword)
+    redirect(`/register?error=${q("Both passwords must match.")}`);
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) redirect(`/register?error=${q("That email is already registered. Try signing in.")}`);
@@ -40,13 +65,9 @@ export async function registerAction(formData: FormData) {
   await sendBuyerSignupAdmin(name, email);
 
   if (emailEnabled()) {
-    const token = randomBytes(24).toString("hex");
-    await prisma.emailVerification.create({
-      data: { token, userId: user.id, expiresAt: new Date(Date.now() + 86400_000) },
-    });
-    const sent = await sendVerificationEmail(email, `${appUrl()}/verify-email?token=${token}`);
+    const sent = await issueVerificationCode(user.id, email);
     if (sent) {
-      redirect(`/login?success=${q("Check your email for a verification link, then sign in.")}`);
+      redirect(`/verify-email?email=${q(email)}&success=${q("We sent a 6-digit code to " + email + ".")}`);
     }
     // The email could not be delivered (e.g. the sending domain isn't verified in
     // Resend yet). Never strand the buyer: activate the account and sign them in.
@@ -69,7 +90,11 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${q("Wrong email or password.")}`);
   }
   if (!user.verified) {
-    redirect(`/login?error=${q("Please verify your email first.")}`);
+    // Send them a fresh code and take them straight to the confirm screen.
+    if (emailEnabled()) await issueVerificationCode(user!.id, user!.email);
+    redirect(
+      `/verify-email?email=${q(user!.email)}&success=${q("Please confirm your email. We sent a new 6-digit code to " + user!.email + ".")}`
+    );
   }
   await createSession(user.id);
   redirect("/dashboard");
@@ -78,6 +103,57 @@ export async function loginAction(formData: FormData) {
 export async function logoutAction() {
   destroySession();
   redirect("/");
+}
+
+/** Confirm an account with the 6-digit code emailed at sign-up. */
+export async function verifyCodeAction(formData: FormData) {
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const code = String(formData.get("code") || "").replace(/\D/g, "");
+  const back = `/verify-email?email=${q(email)}`;
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) redirect(`${back}&error=${q("We could not find that account. Please sign up again.")}`);
+  if (user!.verified) redirect(`/login?success=${q("Your email is already confirmed. Please sign in.")}`);
+
+  const rec = await prisma.emailVerification.findFirst({
+    where: { userId: user!.id },
+    orderBy: { expiresAt: "desc" },
+  });
+  if (!rec || rec.expiresAt < new Date())
+    redirect(`${back}&error=${q("That code has expired. Send yourself a new one below.")}`);
+  if (rec!.attempts >= 6) {
+    await prisma.emailVerification.deleteMany({ where: { userId: user!.id } });
+    redirect(`${back}&error=${q("Too many incorrect codes. Send yourself a new one below.")}`);
+  }
+  if (code.length !== 6 || code !== rec!.code) {
+    await prisma.emailVerification.update({
+      where: { token: rec!.token },
+      data: { attempts: rec!.attempts + 1 },
+    });
+    redirect(`${back}&error=${q("That code is not correct. Please check your email and try again.")}`);
+  }
+
+  await prisma.user.update({ where: { id: user!.id }, data: { verified: true } });
+  await prisma.emailVerification.deleteMany({ where: { userId: user!.id } });
+  await createSession(user!.id);
+  redirect(`/dashboard?success=${q("Email confirmed. Welcome to Ecopulse!")}`);
+}
+
+/** Email a fresh 6-digit code to an account that has not been confirmed yet. */
+export async function resendCodeAction(formData: FormData) {
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const back = `/verify-email?email=${q(email)}`;
+  const user = await prisma.user.findUnique({ where: { email } });
+  // Never reveal whether the address exists.
+  if (!user || user.verified) {
+    redirect(`${back}&success=${q("If that account needs confirming, a new code is on its way.")}`);
+  }
+  if (!emailEnabled()) {
+    await prisma.user.update({ where: { id: user!.id }, data: { verified: true } });
+    redirect(`/login?success=${q("Email sending is off, so your account was activated. Please sign in.")}`);
+  }
+  await issueVerificationCode(user!.id, user!.email);
+  redirect(`${back}&success=${q("A new 6-digit code is on its way to " + email + ".")}`);
 }
 
 export async function forgotAction(formData: FormData) {
@@ -107,8 +183,10 @@ export async function resetAction(formData: FormData) {
   const pr = await prisma.passwordReset.findUnique({ where: { token } });
   if (!pr || pr.expiresAt < new Date())
     redirect(`/reset-password?token=${q(token)}&error=${q("This reset link is invalid or has expired.")}`);
-  if (password.length < 8)
-    redirect(`/reset-password?token=${q(token)}&error=${q("Password must be at least 8 characters.")}`);
+  const pwProblem = passwordProblem(password);
+  if (pwProblem) redirect(`/reset-password?token=${q(token)}&error=${q(pwProblem)}`);
+  if (password !== String(formData.get("confirmPassword") || ""))
+    redirect(`/reset-password?token=${q(token)}&error=${q("Both passwords must match.")}`);
   await prisma.user.update({ where: { id: pr!.userId }, data: { passwordHash: await hashPassword(password) } });
   await prisma.passwordReset.delete({ where: { token } });
   redirect(`/login?success=${q("Password updated. Please sign in.")}`);
@@ -132,8 +210,10 @@ export async function acceptInviteAction(formData: FormData) {
     redirect(`/accept-invite?token=${q(token)}&error=${q("You must agree that payouts are made every Tuesday to be listed.")}`);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     redirect(`/accept-invite?token=${q(token)}&error=${q("Enter a valid email address.")}`);
-  if (password.length < 8)
-    redirect(`/accept-invite?token=${q(token)}&error=${q("Password must be at least 8 characters.")}`);
+  const pwProblem = passwordProblem(password);
+  if (pwProblem) redirect(`/accept-invite?token=${q(token)}&error=${q(pwProblem)}`);
+  if (password !== String(formData.get("confirmPassword") || ""))
+    redirect(`/accept-invite?token=${q(token)}&error=${q("Both passwords must match.")}`);
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {

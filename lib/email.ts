@@ -66,14 +66,16 @@ export function sendInviteEmail(to: string, link: string) {
   );
 }
 
-export function sendVerificationEmail(to: string, link: string) {
+/** Send the 6-digit confirmation code the user types into the confirm screen. */
+export function sendVerificationCodeEmail(to: string, code: string) {
   return send(
     to,
-    "Verify your Ecopulse account",
+    `${code} is your Ecopulse confirmation code`,
     wrap(
-      "Verify your email",
-      `<p>Confirm your email to activate your account.</p>
-       <p><a href="${link}" style="display:inline-block;background:#0aa865;color:#fff;padding:14px 28px;border-radius:30px;text-decoration:none;font-weight:700">Verify email</a></p>`
+      "Confirm your email",
+      `<p>Enter this 6-digit code on the confirmation screen to activate your account:</p>
+       <p style="font-size:34px;font-weight:800;letter-spacing:10px;color:#0aa865;margin:24px 0">${esc(code)}</p>
+       <p style="color:rgba(255,255,255,.6)">This code expires in 15 minutes. If you did not create an Ecopulse account, you can ignore this email.</p>`
     )
   );
 }

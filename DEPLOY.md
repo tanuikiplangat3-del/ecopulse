@@ -108,7 +108,8 @@ jq '.family="ecopulse-task"
         {"name":"NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY","value":"pk_live_..."},
         {"name":"STRIPE_WEBHOOK_SECRET","value":"whsec_..."},
         {"name":"RESEND_API_KEY","value":""},
-        {"name":"MAIL_FROM","value":"Welcome Tomorrow Ecopulse <noreply@welcometomorrow.io>"}
+        {"name":"MAIL_FROM","value":"Welcome Tomorrow Ecopulse <noreply@welcometomorrow.io>"},
+        {"name":"AHREFS_API_KEY","value":"<ahrefs-api-v3-key>"}
       ]' \
   ~/ecopulse-taskdef.json > ~/e2.json && mv ~/e2.json ~/ecopulse-taskdef.json
 

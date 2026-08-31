@@ -1,5 +1,6 @@
 import { resetAction } from "@/app/actions/auth";
 import { Flash } from "@/components/ui";
+import { NewPasswordFields } from "@/components/PasswordField";
 import { one } from "@/lib/util";
 
 export default function ResetPasswordPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
@@ -11,11 +12,7 @@ export default function ResetPasswordPage({ searchParams }: { searchParams: { [k
         <Flash searchParams={searchParams} />
         <form action={resetAction}>
           <input type="hidden" name="token" value={token} />
-          <label className="field">
-            <span>New password</span>
-            <input className="input" type="password" name="password" required minLength={8} autoComplete="new-password" />
-            <small className="muted">At least 8 characters.</small>
-          </label>
+          <NewPasswordFields label="New password" confirmLabel="Confirm new password" />
           <button className="btn-primary w-full" type="submit">Update password</button>
         </form>
       </div>

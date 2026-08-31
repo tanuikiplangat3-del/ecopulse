@@ -93,35 +93,68 @@ export async function bulkUploadAction(formData: FormData) {
     return "";
   };
 
-  let created = 0;
-  const toProcess = rows.slice(0, 200);
-  for (let i = 0; i < toProcess.length; i++) {
-    const row = toProcess[i];
-    const domain = get(row, ["url", "site url", "website", "domain", "site name", "site"]);
+  // Build every row first, then insert them in one go. No Ahrefs calls happen here:
+  // 1000 live lookups could never finish inside a single request. DR and monthly
+  // traffic are filled in afterwards by "Refresh DR & traffic" on the admin
+  // Listings page, which works through them in batches.
+  const MAX_ROWS = 1000;
+  const approved = autoApprove() ? "approved" : "pending";
+  const toProcess = rows.slice(0, MAX_ROWS);
+  const data: any[] = [];
+  let skipped = 0;
+
+  for (const row of toProcess) {
+    const raw = get(row, ["url", "site url", "website", "domain", "site name", "site"]);
     const priceStr = get(row, ["price", "price usd", "cost"]);
     const country = get(row, ["country"]) || "Kenya";
     const language = get(row, ["language", "lang"]) || "English";
     const niche = get(row, ["niche", "niches", "category", "categories"]) || "General";
     const price = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
-    if (!domain || !price || price <= 0) continue;
-    try {
-      // Enrich the first 25 rows with live Ahrefs data; keep the request fast for big sheets.
-      await makeListing(user.id, {
-        domain,
-        category: niche.replace(/;/g, ","),
-        country,
-        language,
-        priceCents: centsFromUsd(price),
-      }, { skipAhrefs: i >= 25 });
-      created++;
-    } catch {
-      // skip a bad row and continue
+    if (!raw || !price || price <= 0) {
+      skipped++;
+      continue;
     }
+    const domain = raw.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/.*$/, "");
+    if (!domain) {
+      skipped++;
+      continue;
+    }
+    data.push({
+      publisherId: user.id,
+      domain,
+      url: `https://${domain}`,
+      category: niche.replace(/;/g, ","),
+      country,
+      language,
+      domainRating: 0,
+      monthlyTraffic: 0,
+      linkType: "guest_post",
+      priceCents: centsFromUsd(price),
+      tatDays: 7,
+      description: "",
+      status: approved,
+    });
+  }
+
+  if (data.length === 0) {
+    redirect(`/bulk-upload?error=${q("No usable rows found. Each row needs a website and a price above 0.")}${first ? "&first=1" : ""}`);
+  }
+
+  // Insert in chunks so a very large sheet never builds one oversized statement.
+  let created = 0;
+  for (let i = 0; i < data.length; i += 250) {
+    const res = await prisma.listing.createMany({ data: data.slice(i, i + 250) });
+    created += res.count;
   }
 
   revalidatePath("/my-listings");
   revalidatePath("/marketplace");
-  redirect(first ? `/payout?first=1` : `/my-listings?success=${q(created + " website(s) uploaded.")}`);
+  const note =
+    `${created} website(s) uploaded.` +
+    (skipped ? ` ${skipped} row(s) were skipped (missing website or price).` : "") +
+    (rows.length > MAX_ROWS ? ` Only the first ${MAX_ROWS} rows were read.` : "") +
+    " Domain Rating and traffic are added shortly.";
+  redirect(first ? `/payout?first=1` : `/my-listings?success=${q(note)}`);
 }
 
 export async function deleteListingAction(formData: FormData) {

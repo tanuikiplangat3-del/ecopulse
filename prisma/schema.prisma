@@ -148,6 +148,8 @@ model PasswordReset {
 model EmailVerification {
   token     String   @id
   userId    Int
+  code      String   @default("") // 6-digit confirmation code the user types in
+  attempts  Int      @default(0)  // wrong-code guesses, to stop brute forcing
   expiresAt DateTime
 }
 

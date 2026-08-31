@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { registerAction } from "@/app/actions/auth";
 import { Flash } from "@/components/ui";
+import { NewPasswordFields } from "@/components/PasswordField";
 
 export default function RegisterPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   return (
@@ -18,11 +19,7 @@ export default function RegisterPage({ searchParams }: { searchParams: { [key: s
             <span>Email</span>
             <input className="input" type="email" name="email" required autoComplete="email" />
           </label>
-          <label className="field">
-            <span>Password</span>
-            <input className="input" type="password" name="password" required minLength={8} autoComplete="new-password" />
-            <small className="muted">At least 8 characters.</small>
-          </label>
+          <NewPasswordFields />
           <button className="btn-primary w-full" type="submit">
             Create account
           </button>
