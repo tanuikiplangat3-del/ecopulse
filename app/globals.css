@@ -116,8 +116,10 @@ select option {
   .h3 { @apply text-2xl font-bold leading-snug; }
   .muted { @apply text-white/60; }
 
-  /* Marketing gradient bands (brand accents) */
-  .band-green { background: linear-gradient(120deg, #0aa865, #9bc846); }
-  .band-blue { background: linear-gradient(120deg, #2b4dff, #4f6bff); }
-  .band-orange { background: linear-gradient(120deg, #f06a5a, #ffd952); }
+  /* Marketing gradient bands - taken verbatim from the welcometomorrow.io theme
+     so the tool's bands render identically to the ones on the main site. */
+  .band-green { background: linear-gradient(90deg, #0aa865, #ffd952 110.15%); }
+  .band-green-v { background: linear-gradient(180deg, #0aa865, #ffd952); }
+  .band-blue { background: linear-gradient(270deg, #0aa865, #2b4dff); }
+  .band-orange { background: linear-gradient(180deg, #ef3e3b, #ffd952); }
 }

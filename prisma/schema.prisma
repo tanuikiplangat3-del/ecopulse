@@ -31,7 +31,7 @@ model User {
   payPaypal      String?  // PayPal email
   payMpesa       String?  // M-Pesa phone
   payCard        String?  // card / other note
-  tuesdayAgreed  Boolean  @default(false) // publisher accepted the Tuesday payout terms
+  tuesdayAgreed  Boolean  @default(false) // publisher accepted the payout terms
   verified       Boolean  @default(false)
   createdAt      DateTime @default(now())
 
@@ -52,6 +52,9 @@ model Listing {
   domainRating   Int       @default(0)
   monthlyTraffic Int       @default(0)
   metricsUpdatedAt DateTime? // last time DR + traffic were fetched from Ahrefs
+  // Which buyer-pricing rule applies. Sites listed before the tiered pricing
+  // launch keep "flat30" (+$30) for life; everything new is created as "tiered".
+  markupModel    String   @default("flat30")
   linkType       String   @default("guest_post") // guest_post | niche_edit
   priceCents     Int      @default(0) // publisher's price (what they receive), in cents
   tatDays        Int      @default(7)

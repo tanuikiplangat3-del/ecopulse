@@ -107,8 +107,9 @@ async function PublisherDash({ user }: { user: any }) {
   return (
     <div>
       <div className="mb-5 flash flash-info">
-        All payments for all orders are paid weekly on Tuesday. Any payment not received by
-        then, contact seo@welcometomorrow.io immediately to be resolved.
+        Payments are released within <strong>72 hours</strong> of the buyer confirming your link
+        is live. If a payment has not arrived within that window, contact seo@welcometomorrow.io
+        immediately and we will resolve it.
       </div>
 
       {!hasPayout && (

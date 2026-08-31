@@ -12,11 +12,46 @@ type L = {
   monthlyTraffic: number;
   linkType: string;
   priceCents: number;
+  markupModel?: string | null;
 };
 
-export default function ListingCard({ listing }: { listing: L }) {
+export default function ListingCard({ listing, locked = false }: { listing: L; locked?: boolean }) {
   const niches = listing.category.split(",").filter(Boolean).slice(0, 3);
   const siteUrl = listing.url || `https://${listing.domain}`;
+
+  // Locked cards are already redacted server-side (see lib/access.ts); the blur
+  // is only what the viewer sees. Nothing here is a link, so the card is inert.
+  if (locked) {
+    return (
+      <div className="card relative overflow-hidden" aria-hidden="true">
+        <div className="pointer-events-none select-none blur-[7px] saturate-50">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-lg font-bold">hidden-website.com</p>
+              <p className="muted text-sm">{listing.country}</p>
+            </div>
+            <span className="badge badge-green whitespace-nowrap">$000.00</span>
+          </div>
+          <div className="mt-4 flex gap-4 text-sm">
+            <div><p className="muted text-xs">DR</p><p className="font-semibold">00</p></div>
+            <div><p className="muted text-xs">Traffic</p><p className="font-semibold">00K</p></div>
+            <div><p className="muted text-xs">Type</p><p className="font-semibold">Guest Post</p></div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="badge badge-muted">Niche</span>
+            <span className="badge badge-muted">Niche</span>
+          </div>
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/70">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
   return (
     // The whole card stays clickable via the stretched link on the domain below,
     // which leaves the "open the real site" link free to sit on top of it.
@@ -47,7 +82,7 @@ export default function ListingCard({ listing }: { listing: L }) {
           </div>
           <p className="muted text-sm">{listing.country}</p>
         </div>
-        <span className="badge badge-green whitespace-nowrap">{money(buyerPrice(listing.priceCents))}</span>
+        <span className="badge badge-green whitespace-nowrap">{money(buyerPrice(listing.priceCents, listing.markupModel))}</span>
       </div>
 
       <div className="mt-4 flex gap-4 text-sm">

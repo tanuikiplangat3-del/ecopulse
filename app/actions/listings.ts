@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-import { centsFromUsd } from "@/lib/money";
+import { centsFromUsd, MARKUP_TIERED } from "@/lib/money";
 import { fetchDomainMetrics } from "@/lib/ahrefs";
 
 const q = (s: string) => encodeURIComponent(s);
@@ -31,6 +31,7 @@ async function makeListing(publisherId: number, data: {
       language: data.language || "English",
       domainRating: dr,
       monthlyTraffic: traffic,
+      markupModel: MARKUP_TIERED, // new sites use tiered pricing; older ones keep +$30
       // Only mark as fetched when Ahrefs actually answered, so the weekly
       // refresh picks it up straight away if it did not.
       metricsUpdatedAt: metrics.ok ? new Date() : null,
@@ -133,6 +134,7 @@ export async function bulkUploadAction(formData: FormData) {
       language,
       domainRating: 0,
       monthlyTraffic: 0,
+      markupModel: MARKUP_TIERED,
       linkType: "guest_post",
       priceCents: centsFromUsd(price),
       tatDays: 7,

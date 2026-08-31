@@ -68,10 +68,11 @@ export default async function AcceptInvitePage({
                   <label className="mt-2 flex items-start gap-3 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
                     <input type="checkbox" name="agreeTuesday" className="mt-1" required />
                     <span>
-                      I understand and agree that all payments for all orders are paid weekly on
-                      <strong> Tuesday</strong>. If a payment is not received by then, I will contact
-                      seo@welcometomorrow.io to resolve it. I understand my site will not be listed if
-                      I do not agree.
+                      I understand and agree that payment for each order is released within
+                      <strong> 72 hours</strong> of the buyer confirming the link is live. If a
+                      payment has not arrived within that window, I will contact
+                      seo@welcometomorrow.io to resolve it. I understand my site will not be listed
+                      if I do not agree.
                     </span>
                   </label>
                 </>

@@ -25,7 +25,11 @@ export default async function TopupPage({ searchParams }: { searchParams: { [key
           </label>
           <button className="btn-primary" type="submit" disabled={!stripeEnabled()}>Top up</button>
         </form>
-        <p className="muted mt-3 text-xs">A 5% service fee applies.</p>
+        <p className="muted mt-3 text-xs">
+          Your full deposit is added to your balance &mdash; no deposit fee. Balance amounts are
+          exclusive of VAT and service fees; both are already included in the price shown on each
+          website, so nothing further is deducted from your balance.
+        </p>
       </div>
 
       {txs.length > 0 && (

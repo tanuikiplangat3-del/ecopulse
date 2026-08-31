@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import ListingCard from "@/components/ListingCard";
-import { centsFromUsd, STANDARD_MARKUP_CENTS } from "@/lib/money";
+import { centsFromUsd, publisherPriceFromBuyer } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -62,14 +62,13 @@ export default async function HomePage() {
   if (user) redirect(user.role === "buyer" ? "/marketplace" : "/dashboard");
 
   // Featured = strong sites that are still affordable: DR 50+ and a buyer price
-  // under $300. buyerPrice() adds the standard markup on top of the stored
-  // publisher price, so the stored price must be under ($300 - markup) for the
-  // price shown on the card to stay under $300.
+  // under $300. The markup varies by band, so work back from the $300 the buyer
+  // would see to the publisher price that produces it.
   const featured = await prisma.listing.findMany({
     where: {
       status: "approved",
       domainRating: { gte: 50 },
-      priceCents: { lt: centsFromUsd(300) - STANDARD_MARKUP_CENTS },
+      priceCents: { lt: publisherPriceFromBuyer(centsFromUsd(300)) },
     },
     orderBy: { domainRating: "desc" },
     take: 6,

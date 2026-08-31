@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getViewerAccess, FREE_PREVIEW_COUNT } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { money, buyerPrice, trafficShort } from "@/lib/money";
@@ -18,6 +19,21 @@ export default async function ListingPage({
   const listing = await prisma.listing.findUnique({ where: { id } });
   if (!listing || listing.status !== "approved") notFound();
   const user = await getCurrentUser();
+
+  // Paywall. Without this check a locked visitor could simply type a listing URL
+  // and read everything the marketplace was hiding. A listing is open only if it
+  // falls inside the free preview - the newest FREE_PREVIEW_COUNT approved sites,
+  // which is exactly the set the marketplace shows unblurred.
+  const access = await getViewerAccess(user);
+  if (!access.unlocked) {
+    const newerCount = await prisma.listing.count({
+      where: { status: "approved", createdAt: { gt: listing!.createdAt } },
+    });
+    if (newerCount >= FREE_PREVIEW_COUNT) {
+      redirect(user ? "/topup?locked=1" : "/register");
+    }
+  }
+
   const niches = listing.category.split(",").filter(Boolean);
 
   return (
@@ -63,7 +79,7 @@ export default async function ListingPage({
       <div>
         <div className="card sticky top-20">
           <p className="muted text-sm">Price</p>
-          <p className="mb-4 text-3xl font-bold text-wt-green">{money(buyerPrice(listing.priceCents))}</p>
+          <p className="mb-4 text-3xl font-bold text-wt-green">{money(buyerPrice(listing.priceCents, listing.markupModel))}</p>
           <Flash searchParams={searchParams} />
 
           {!user && (

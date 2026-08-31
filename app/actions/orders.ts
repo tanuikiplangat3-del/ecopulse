@@ -43,7 +43,7 @@ export async function placeOrderAction(formData: FormData) {
   const img = await readUpload(formData.get("featuredImageFile"), 4 * 1024 * 1024);
   if (img === "too_big") redirect(`/listing/${listingId}?error=${q("Your image is larger than 4MB. Please upload a smaller image.")}`);
 
-  const amount = buyerPrice(listing!.priceCents);
+  const amount = buyerPrice(listing!.priceCents, listing!.markupModel);
   const order = await prisma.order.create({
     data: {
       buyerId: user.id,

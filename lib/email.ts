@@ -102,7 +102,8 @@ export function sendDepositReceipt(to: string, grossCents: number, netCents: num
     wrap(
       "Deposit received",
       `<p>We have received your deposit of <strong>${money(grossCents)}</strong>.</p>
-       <p>After the 5% service fee, <strong>${money(netCents)}</strong> has been added to your wallet balance and is ready to use.</p>
+       <p>The full <strong>${money(netCents)}</strong> has been added to your wallet balance and is ready to use.</p>
+       <p style="color:rgba(255,255,255,.6)">Balance amounts are shown exclusive of VAT and service fees. Both are already included in the price shown on each website, so nothing further is deducted from your balance.</p>
        <p>Your invoice will be emailed to you within 24 hours.</p>`
     )
   );
@@ -160,7 +161,7 @@ export function sendPublisherWelcome(to: string, name: string) {
       "Welcome aboard",
       `<p>Hi ${esc(name)}, your publisher account is active.</p>
        <p>Add the websites you want to list, then set your payment details so we can pay you.</p>
-       <p>Payouts are made weekly on <strong>Tuesday</strong> for every order marked complete.</p>`
+       <p>Payment for each order is released within <strong>72 hours</strong> of the buyer confirming your link is live.</p>`
     )
   );
 }
@@ -230,7 +231,7 @@ export function sendDepositAdmin(buyerEmail: string, grossCents: number, netCent
       `<p>A buyer topped up their wallet:</p>
        <p><strong>Buyer:</strong> ${esc(buyerEmail)}<br>
           <strong>Deposited:</strong> ${money(grossCents)}<br>
-          <strong>Credited after the 5% service fee:</strong> ${money(netCents)}</p>
+          <strong>Credited to their wallet:</strong> ${money(netCents)}</p>
        <p>Remember to send their invoice within 24 hours.</p>`
     )
   );
@@ -244,7 +245,7 @@ export function sendPublisherPaid(to: string, orderId: number, domain: string) {
     wrap(
       "Your payment has been approved",
       `<p>Your payment for order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong> has been approved.</p>
-       <p>It will be sent to your saved payment details on the next <strong>Tuesday</strong> payout run.</p>
+       <p>It will be sent to your saved payment details within <strong>72 hours</strong>.</p>
        <p>If anything looks wrong, reply to this email and we will sort it out.</p>`
     )
   );

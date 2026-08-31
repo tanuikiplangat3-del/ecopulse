@@ -218,7 +218,7 @@ export async function acceptInviteAction(formData: FormData) {
   const email = (String(formData.get("email") || "") || invite!.email || "").trim().toLowerCase();
   if (!name) redirect(`/accept-invite?token=${q(token)}&error=${q("Please enter your name.")}`);
   if (!isAdminInvite && !agreedTuesday)
-    redirect(`/accept-invite?token=${q(token)}&error=${q("You must agree that payouts are made every Tuesday to be listed.")}`);
+    redirect(`/accept-invite?token=${q(token)}&error=${q("You must agree to the payment terms to be listed.")}`);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     redirect(`/accept-invite?token=${q(token)}&error=${q("Enter a valid email address.")}`);
   const pwProblem = passwordProblem(password);
