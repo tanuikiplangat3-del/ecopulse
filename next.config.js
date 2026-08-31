@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Served under tools.welcometomorrow.io/ecopulse (sibling of /ranktomorrow)
-  basePath: "/ecopulse",
+  // Served under tools.welcometomorrow.io/linktomorrow (sibling of /ranktomorrow)
+  basePath: "/linktomorrow",
   // Self-contained server build for a small Docker image (matches ranktomorrow)
   output: "standalone",
   images: {

@@ -8,7 +8,7 @@ export default function LoginPage({ searchParams }: { searchParams: { [key: stri
     <div className="mx-auto max-w-md">
       <div className="card">
         <h1 className="h2 mb-1">Sign in</h1>
-        <p className="muted mb-5">Welcome back to Ecopulse.</p>
+        <p className="muted mb-5">Welcome back to Link Tomorrow.</p>
         <Flash searchParams={searchParams} />
         <form action={loginAction}>
           <label className="field">

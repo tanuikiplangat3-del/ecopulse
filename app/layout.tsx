@@ -6,17 +6,17 @@ import { Background } from "@/components/Background";
 import ChatWidget from "@/components/ChatWidget";
 
 const SITE = "https://tools.welcometomorrow.io";
-const PATH = "/ecopulse";
+const PATH = "/linktomorrow";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: {
-    default: "Welcome Tomorrow Ecopulse | Link Building Marketplace",
-    template: "%s | Welcome Tomorrow Ecopulse",
+    default: "Best Backlink Marketplace in Africa | Link Tomorrow",
+    template: "%s | Link Tomorrow",
   },
   description:
     "Acquire quality backlinks and guest posts from vetted African publishers. Build your backlink profile with escrow-protected orders and transparent pricing.",
-  applicationName: "Welcome Tomorrow Ecopulse",
+  applicationName: "Link Tomorrow",
   keywords: [
     "link building", "backlinks", "guest posts", "niche edits",
     "backlink marketplace", "African publishers", "SEO", "Welcome Tomorrow",
@@ -24,15 +24,15 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE}${PATH}` },
   openGraph: {
     type: "website",
-    title: "Welcome Tomorrow Ecopulse | Link Building Marketplace",
+    title: "Best Backlink Marketplace in Africa | Link Tomorrow",
     description:
       "Acquire quality backlinks and guest posts from vetted African publishers. Build your backlink profile with us.",
     url: `${SITE}${PATH}`,
-    siteName: "Welcome Tomorrow Ecopulse",
+    siteName: "Link Tomorrow",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Welcome Tomorrow Ecopulse | Link Building Marketplace",
+    title: "Best Backlink Marketplace in Africa | Link Tomorrow",
     description: "Acquire quality backlinks and guest posts from vetted African publishers.",
   },
   robots: { index: true, follow: true },

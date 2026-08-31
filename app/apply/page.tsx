@@ -6,12 +6,12 @@ export const metadata: Metadata = {
   title: "Request to Be a Publisher",
   description:
     "Own a website with strong authority and steady traffic? Request to be listed on the Welcome Tomorrow link building marketplace. Every site is reviewed before it goes live.",
-  alternates: { canonical: "https://tools.welcometomorrow.io/ecopulse/apply" },
+  alternates: { canonical: "https://tools.welcometomorrow.io/linktomorrow/apply" },
   openGraph: {
     title: "Request to Be a Publisher | Welcome Tomorrow",
     description:
       "Apply to list your website on the Welcome Tomorrow link building marketplace. Every site is reviewed before it goes live.",
-    url: "https://tools.welcometomorrow.io/ecopulse/apply",
+    url: "https://tools.welcometomorrow.io/linktomorrow/apply",
   },
 };
 

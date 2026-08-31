@@ -1,4 +1,4 @@
-# Welcome Tomorrow Ecopulse - Link Building Marketplace
+# Link Tomorrow - Link Building Marketplace
 
 A backlink / guest-post marketplace (like serpzilla.com) with three roles - **buyer**,
 **publisher** (invite-only), and **admin** - built in Next.js 14 to match the
@@ -27,7 +27,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open **http://localhost:3000/ecopulse**
+Open **http://localhost:3000/linktomorrow**
 
 - Sign in as **admin** with the ADMIN_EMAIL / ADMIN_PASSWORD from `.env`.
 - A demo publisher and 4 approved listings are seeded so the marketplace isn't empty.
@@ -47,7 +47,7 @@ Add your Stripe **test** keys to `.env` (`STRIPE_SECRET_KEY`,
 `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`). Test card `4242 4242 4242 4242`, any future date,
 any CVC. For the webhook locally:
 ```bash
-stripe listen --forward-to localhost:3000/ecopulse/api/stripe/webhook
+stripe listen --forward-to localhost:3000/linktomorrow/api/stripe/webhook
 ```
 Put the printed signing secret in `STRIPE_WEBHOOK_SECRET`. Without Stripe keys the app
 still runs - buyers just pay from their wallet balance.
@@ -58,7 +58,7 @@ new buyers auto-verify and invite links are shown on screen instead.
 
 ## Going to production
 See **DEPLOY.md** - switch Prisma to PostgreSQL, set live env vars, build the Docker
-image, and deploy under `tools.welcometomorrow.io/ecopulse` the same way ranktomorrow is
+image, and deploy under `tools.welcometomorrow.io/linktomorrow` the same way ranktomorrow is
 deployed.
 
 ## Project structure

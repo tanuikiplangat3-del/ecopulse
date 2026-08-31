@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@prisma/client";
 
-const COOKIE = "ecopulse_session";
+const COOKIE = "linktomorrow_session";
 const secret = new TextEncoder().encode(
   process.env.AUTH_SECRET || "dev-insecure-secret-change-me"
 );

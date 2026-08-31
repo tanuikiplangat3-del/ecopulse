@@ -143,7 +143,7 @@ export async function verifyCodeAction(formData: FormData) {
   await prisma.user.update({ where: { id: user!.id }, data: { verified: true } });
   await prisma.emailVerification.deleteMany({ where: { userId: user!.id } });
   await createSession(user!.id);
-  redirect(`/dashboard?success=${q("Email confirmed. Welcome to Ecopulse!")}`);
+  redirect(`/dashboard?success=${q("Email confirmed. Welcome to Link Tomorrow!")}`);
 }
 
 /** Email a fresh 6-digit code to an account that has not been confirmed yet. */
@@ -175,7 +175,7 @@ export async function forgotAction(formData: FormData) {
     const link = `${appUrl()}/reset-password?token=${token}`;
     if (emailEnabled()) {
       const { sendOrderNotice } = await import("@/lib/email");
-      await sendOrderNotice(email, "Reset your Ecopulse password", `Open this link to reset your password: <a href="${link}">${link}</a>`);
+      await sendOrderNotice(email, "Reset your Link Tomorrow password", `Open this link to reset your password: <a href="${link}">${link}</a>`);
       redirect(`/login?success=${q("If that email exists, a reset link is on its way.")}`);
     }
     // Email sending is off - never print the reset link on screen, since anyone

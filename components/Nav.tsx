@@ -54,7 +54,7 @@ export default async function Nav() {
               <span className="hidden text-white/50 lg:inline" title={u.email}>
                 {u.name}
               </span>
-              <a href="/ecopulse/logout" className="btn-ghost btn-sm">
+              <a href="/linktomorrow/logout" className="btn-ghost btn-sm">
                 Sign out
               </a>
             </>

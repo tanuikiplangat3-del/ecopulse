@@ -9,7 +9,7 @@ import { centsFromUsd, STANDARD_MARKUP_CENTS } from "@/lib/money";
 export const dynamic = "force-dynamic";
 
 const SITE = "https://tools.welcometomorrow.io";
-const PATH = "/ecopulse";
+const PATH = "/linktomorrow";
 
 // SEO metadata is generated dynamically from live marketplace data.
 export async function generateMetadata(): Promise<Metadata> {
@@ -32,7 +32,8 @@ export async function generateMetadata(): Promise<Metadata> {
       ? `Acquire quality backlinks and guest posts from ${sites}+ vetted publisher websites across ${countries || 54} African markets. Escrow-protected orders, transparent pricing, and verified placements with Welcome Tomorrow.`
       : "Acquire quality backlinks and guest posts from vetted African publishers. Escrow-protected orders, transparent pricing, and verified placements with Welcome Tomorrow.";
 
-  const title = "Build Your Backlink Profile With African Publishers";
+  // The layout's title template appends " | Link Tomorrow".
+  const title = "Best Backlink Marketplace in Africa";
 
   return {
     title,
@@ -45,10 +46,10 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: { canonical: `${SITE}${PATH}` },
     openGraph: {
       type: "website",
-      title: `${title} | Welcome Tomorrow`,
+      title: `${title} | Link Tomorrow`,
       description,
       url: `${SITE}${PATH}`,
-      siteName: "Welcome Tomorrow Ecopulse",
+      siteName: "Link Tomorrow",
     },
     twitter: { card: "summary_large_image", title, description },
     robots: { index: true, follow: true },

@@ -1,4 +1,4 @@
-// Welcome Tomorrow Ecopulse - data model (ported from the reference PHP app).
+// Link Tomorrow - data model (ported from the reference PHP app).
 // Money is stored as integer USD cents everywhere.
 //
 // LOCAL DEV uses SQLite (works with zero setup).

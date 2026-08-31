@@ -1,8 +1,8 @@
 {
-  "name": "ecopulse",
+  "name": "linktomorrow",
   "version": "1.0.0",
   "private": true,
-  "description": "Welcome Tomorrow Ecopulse — Link Building Marketplace",
+  "description": "Link Tomorrow — Link Building Marketplace",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",

@@ -36,7 +36,7 @@ export function sendContactEmail(input: { name: string; email: string; message: 
     ADMIN_NOTIFY,
     `New chat message from ${input.name}`,
     wrap(
-      "New message from the Ecopulse chat",
+      "New message from the Link Tomorrow chat",
       `<p><strong>Name:</strong> ${esc(input.name)}</p>
        <p><strong>Email:</strong> ${esc(input.email)}</p>
        <p><strong>Message:</strong></p>
@@ -50,16 +50,16 @@ const wrap = (title: string, body: string) => `
   <div style="font-family:Outfit,Arial,sans-serif;background:#000;color:#fff;padding:32px;border-radius:20px">
     <h1 style="color:#0aa865;margin:0 0 16px">${title}</h1>
     <div style="font-size:16px;line-height:1.5;color:#fff">${body}</div>
-    <p style="color:rgba(255,255,255,.6);font-size:13px;margin-top:24px">Welcome Tomorrow Ecopulse - Link Building Marketplace</p>
+    <p style="color:rgba(255,255,255,.6);font-size:13px;margin-top:24px">Link Tomorrow - Link Building Marketplace</p>
   </div>`;
 
 export function sendInviteEmail(to: string, link: string) {
   return send(
     to,
-    "You've been invited to publish on Welcome Tomorrow Ecopulse",
+    "You've been invited to publish on Link Tomorrow",
     wrap(
       "You're invited to become a publisher",
-      `<p>You've been invited to list your websites on the Welcome Tomorrow Ecopulse link-building marketplace.</p>
+      `<p>You've been invited to list your websites on the Link Tomorrow link-building marketplace.</p>
        <p><a href="${link}" style="display:inline-block;background:#0aa865;color:#fff;padding:14px 28px;border-radius:30px;text-decoration:none;font-weight:700">Accept your invite</a></p>
        <p style="color:rgba(255,255,255,.6)">This link expires in 7 days.</p>`
     )
@@ -70,12 +70,12 @@ export function sendInviteEmail(to: string, link: string) {
 export function sendVerificationCodeEmail(to: string, code: string) {
   return send(
     to,
-    `${code} is your Ecopulse confirmation code`,
+    `${code} is your Link Tomorrow confirmation code`,
     wrap(
       "Confirm your email",
       `<p>Enter this 6-digit code on the confirmation screen to activate your account:</p>
        <p style="font-size:34px;font-weight:800;letter-spacing:10px;color:#0aa865;margin:24px 0">${esc(code)}</p>
-       <p style="color:rgba(255,255,255,.6)">This code expires in 15 minutes. If you did not create an Ecopulse account, you can ignore this email.</p>`
+       <p style="color:rgba(255,255,255,.6)">This code expires in 15 minutes. If you did not create a Link Tomorrow account, you can ignore this email.</p>`
     )
   );
 }
@@ -145,7 +145,7 @@ export function sendBuyerSignupAdmin(name: string, email: string) {
 export function sendPublisherWelcome(to: string, name: string) {
   return send(
     to,
-    "Your publisher account is ready - Welcome Tomorrow Ecopulse",
+    "Your publisher account is ready - Link Tomorrow",
     wrap(
       "Welcome aboard",
       `<p>Hi ${esc(name)}, your publisher account is active.</p>
@@ -186,10 +186,10 @@ export function sendAdminSignupAdmin(name: string, email: string) {
 export function sendAdminInviteEmail(to: string, link: string) {
   return send(
     to,
-    "You've been invited as an admin on Welcome Tomorrow Ecopulse",
+    "You've been invited as an admin on Link Tomorrow",
     wrap(
       "You're invited as an admin",
-      `<p>You've been given admin access to the Welcome Tomorrow Ecopulse marketplace.</p>
+      `<p>You've been given admin access to the Link Tomorrow marketplace.</p>
        <p><a href="${link}" style="display:inline-block;background:#0aa865;color:#fff;padding:14px 28px;border-radius:30px;text-decoration:none;font-weight:700">Set up your admin account</a></p>
        <p style="color:rgba(255,255,255,.6)">This link expires in 7 days. Do not forward it - anyone who opens it gets full admin access.</p>`
     )

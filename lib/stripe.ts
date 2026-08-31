@@ -9,7 +9,7 @@ export const stripe: Stripe | null = key
   : null;
 
 export const appUrl = (): string =>
-  (process.env.APP_URL || "http://localhost:3000/ecopulse").replace(/\/$/, "");
+  (process.env.APP_URL || "http://localhost:3000/linktomorrow").replace(/\/$/, "");
 
 /**
  * Create a Stripe Checkout Session for a one-off USD payment.
