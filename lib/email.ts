@@ -186,6 +186,67 @@ export async function sendOrderConfirmedEmails(input: {
   );
 }
 
+/** A buyer asked us to list a publisher they negotiated -> admin review needed. */
+export function sendSiteRequestAdmin(input: {
+  requestId: number;
+  buyerName: string;
+  buyerEmail: string;
+  siteName: string;
+  domain: string;
+  negotiatedCents: number;
+  vatPercent: number;
+}) {
+  return send(
+    ADMIN_NOTIFY,
+    `Site request: ${input.domain} (from ${input.buyerName})`,
+    wrap(
+      "New site request to review",
+      `<p><strong>${esc(input.buyerName)}</strong> (${esc(input.buyerEmail)}) has asked us to list a
+          publisher they negotiated with.</p>
+       <p><strong>Site:</strong> ${esc(input.siteName)}<br>
+          <strong>Domain:</strong> ${esc(input.domain)}<br>
+          <strong>Negotiated price:</strong> ${money(input.negotiatedCents)}<br>
+          <strong>VAT:</strong> ${input.vatPercent > 0 ? input.vatPercent + "%" : "none"}</p>
+       <p>Approve or reject it on the admin <strong>Site requests</strong> page. Approving lists it
+          immediately: this buyer will see their negotiated price plus 5%, and every other buyer
+          will see the standard margin.</p>`
+    )
+  );
+}
+
+/** Tell the buyer whether their requested site was listed. */
+export function sendSiteRequestDecision(input: {
+  to: string;
+  approved: boolean;
+  domain: string;
+  listingId?: number;
+  note?: string;
+}) {
+  if (input.approved) {
+    return send(
+      input.to,
+      `${input.domain} is now listed`,
+      wrap(
+        "Your requested site is live",
+        `<p><strong>${esc(input.domain)}</strong> has been reviewed and added to the marketplace.</p>
+         <p>You will see it at your negotiated price plus the 5% platform service fee. You can order
+            a placement on it from the marketplace now.</p>`
+      )
+    );
+  }
+  return send(
+    input.to,
+    `About your request for ${input.domain}`,
+    wrap(
+      "We could not list that site",
+      `<p>Thank you for sending us <strong>${esc(input.domain)}</strong>. After review we are not able
+          to add it to the marketplace at this time.</p>
+       ${input.note ? `<p><strong>Reason:</strong><br>${esc(input.note)}</p>` : ""}
+       <p>You are welcome to send us other publishers you have negotiated with.</p>`
+    )
+  );
+}
+
 /** A new buyer registered -> let the admin desk know. */
 export function sendBuyerSignupAdmin(name: string, email: string) {
   return send(

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireUser } from "@/lib/auth";
-import { buyerPrice, commissionRate } from "@/lib/money";
+import { buyerPrice, listingBaseCents, commissionRate } from "@/lib/money";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
 import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin, sendOrderConfirmedEmails } from "@/lib/email";
 
@@ -43,7 +43,14 @@ export async function placeOrderAction(formData: FormData) {
   const img = await readUpload(formData.get("featuredImageFile"), 4 * 1024 * 1024);
   if (img === "too_big") redirect(`/listing/${listingId}?error=${q("Your image is larger than 4MB. Please upload a smaller image.")}`);
 
-  const amount = buyerPrice(listing!.priceCents, listing!.markupModel);
+  // Requested sites are priced per buyer: the buyer who negotiated the deal pays
+  // their price + 5%, everyone else pays the standard margin. VAT (if any) is
+  // added on top and passed through to the publisher.
+  const amount = buyerPrice(listing!.priceCents, listing!.markupModel, {
+    vatPercent: listing!.vatPercent,
+    isRequester: listing!.requestedById === user.id,
+  });
+  const payout = listingBaseCents(listing!.priceCents, listing!.vatPercent);
   const order = await prisma.order.create({
     data: {
       buyerId: user.id,
@@ -57,7 +64,7 @@ export async function placeOrderAction(formData: FormData) {
       articleDocUrl: doc ? doc.url : null,
       turnaroundDays: tat,
       amountCents: amount,
-      payoutCents: listing!.priceCents,
+      payoutCents: payout,
       commissionRate: String(commissionRate()),
       status: "pending_payment",
     },

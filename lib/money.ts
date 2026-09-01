@@ -74,17 +74,49 @@ export const LEGACY_MARKUP_CENTS = 3000; // $30
 /** The pricing rule a listing was created under. */
 export const MARKUP_TIERED = "tiered";
 export const MARKUP_FLAT30 = "flat30";
+export const MARKUP_REQUESTED = "requested";
+
+/** Platform fee charged to the buyer who negotiated a site themselves. */
+export const REQUESTER_FEE_RATE = 0.05;
 
 /**
- * What the buyer pays for a listing, in cents.
- *
- * Sites listed before tiered pricing launched keep the old flat $30 markup for
- * life, so nobody's existing listing changes price underneath them. Only sites
- * added from now on use the tiered rates.
+ * The publisher's price with VAT added. VAT is charged on top and passed
+ * through to the publisher, so it forms the base that any margin sits on.
+ * Ordinary listings carry no VAT, so this returns the price untouched.
  */
-export function buyerPrice(publisherCents: number, markupModel?: string | null): number {
-  if (markupModel !== MARKUP_TIERED) return publisherCents + LEGACY_MARKUP_CENTS;
-  return Math.round(publisherCents * (1 + markupRate(publisherCents)));
+export function listingBaseCents(publisherCents: number, vatPercent?: number | null): number {
+  const vat = vatPercent || 0;
+  if (vat <= 0) return publisherCents;
+  return Math.round(publisherCents * (1 + vat / 100));
+}
+
+/**
+ * What a buyer pays for a listing, in cents.
+ *
+ * Three rules are live at once:
+ *   flat30    - sites listed before tiered pricing: publisher price + $30, for life
+ *   tiered    - everything listed since: +45% / +25% by band
+ *   requested - a site a buyer negotiated themselves. That buyer pays their
+ *               negotiated price + 5%; every other buyer pays the tiered margin.
+ *
+ * `isRequester` must only ever be true for the buyer whose id matches the
+ * listing's requestedById - it is what separates their price from everyone else's.
+ */
+export function buyerPrice(
+  publisherCents: number,
+  markupModel?: string | null,
+  opts?: { vatPercent?: number | null; isRequester?: boolean }
+): number {
+  const base = listingBaseCents(publisherCents, opts?.vatPercent);
+
+  if (markupModel === MARKUP_REQUESTED) {
+    if (opts?.isRequester) return Math.round(base * (1 + REQUESTER_FEE_RATE));
+    return Math.round(base * (1 + markupRate(base)));
+  }
+  if (markupModel === MARKUP_TIERED) {
+    return Math.round(base * (1 + markupRate(base)));
+  }
+  return base + LEGACY_MARKUP_CENTS;
 }
 
 /**

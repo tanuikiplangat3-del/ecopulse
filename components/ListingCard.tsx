@@ -13,9 +13,19 @@ type L = {
   linkType: string;
   priceCents: number;
   markupModel?: string | null;
+  requestedById?: number | null;
+  vatPercent?: number | null;
 };
 
-export default function ListingCard({ listing, locked = false }: { listing: L; locked?: boolean }) {
+export default function ListingCard({
+  listing,
+  locked = false,
+  viewerId,
+}: {
+  listing: L;
+  locked?: boolean;
+  viewerId?: number | null;
+}) {
   const niches = listing.category.split(",").filter(Boolean).slice(0, 3);
   const siteUrl = listing.url || `https://${listing.domain}`;
 
@@ -82,7 +92,12 @@ export default function ListingCard({ listing, locked = false }: { listing: L; l
           </div>
           <p className="muted text-sm">{listing.country}</p>
         </div>
-        <span className="badge badge-green whitespace-nowrap">{money(buyerPrice(listing.priceCents, listing.markupModel))}</span>
+        <span className="badge badge-green whitespace-nowrap">{money(
+            buyerPrice(listing.priceCents, listing.markupModel, {
+              vatPercent: listing.vatPercent,
+              isRequester: !!viewerId && listing.requestedById === viewerId,
+            })
+          )}</span>
       </div>
 
       <div className="mt-4 flex gap-4 text-sm">

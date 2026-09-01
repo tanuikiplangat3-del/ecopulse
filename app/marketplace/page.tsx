@@ -138,7 +138,7 @@ export default async function MarketplacePage({
         <>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {rows.map((r, i) => (
-              <ListingCard key={r.listing.id ?? i} listing={r.listing} locked={r.locked} />
+              <ListingCard key={r.listing.id ?? i} listing={r.listing} locked={r.locked} viewerId={user?.id} />
             ))}
           </div>
 

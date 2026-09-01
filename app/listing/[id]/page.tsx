@@ -79,7 +79,12 @@ export default async function ListingPage({
       <div>
         <div className="card sticky top-20">
           <p className="muted text-sm">Price</p>
-          <p className="mb-4 text-3xl font-bold text-wt-green">{money(buyerPrice(listing.priceCents, listing.markupModel))}</p>
+          <p className="mb-4 text-3xl font-bold text-wt-green">{money(
+            buyerPrice(listing.priceCents, listing.markupModel, {
+              vatPercent: listing.vatPercent,
+              isRequester: !!user && listing.requestedById === user.id,
+            })
+          )}</p>
           <Flash searchParams={searchParams} />
 
           {!user && (

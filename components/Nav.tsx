@@ -39,9 +39,14 @@ export default async function Nav() {
                 </>
               )}
               {u.role === "buyer" && (
-                <Link href="/topup" className="text-white/85 hover:text-white">
-                  Balance: {money(u.balanceCents)}
-                </Link>
+                <>
+                  <Link href="/request-site" className="text-white/85 hover:text-white">
+                    Request a site
+                  </Link>
+                  <Link href="/topup" className="text-white/85 hover:text-white">
+                    Balance: {money(u.balanceCents)}
+                  </Link>
+                </>
               )}
               <Link href="/orders" className="text-white/85 hover:text-white">
                 Orders

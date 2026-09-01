@@ -55,6 +55,11 @@ model Listing {
   // Which buyer-pricing rule applies. Sites listed before the tiered pricing
   // launch keep "flat30" (+$30) for life; everything new is created as "tiered".
   markupModel    String   @default("flat30")
+  // Buyer-requested sites: the buyer who negotiated the deal pays cost + 5%,
+  // everyone else pays the standard tiered margin.
+  requestedById  Int?
+  siteRequestId  Int?
+  vatPercent     Float    @default(0) // added to the publisher price before any margin
   linkType       String   @default("guest_post") // guest_post | niche_edit
   priceCents     Int      @default(0) // publisher's price (what they receive), in cents
   tatDays        Int      @default(7)
@@ -133,14 +138,40 @@ model Invite {
   @@index([email])
 }
 
+/**
+ * A buyer asking us to list a publisher they have negotiated with themselves.
+ * On approval this becomes a Listing priced two ways: the requesting buyer pays
+ * their negotiated price plus 5%, every other buyer pays the standard margin.
+ */
 model SiteRequest {
-  id        Int      @id @default(autoincrement())
-  buyerId   Int
-  urls      String?
-  status    String   @default("open") // open | closed
-  adminNote String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  buyerId         Int
+  siteName        String
+  domain          String
+  negotiatedCents Int      @default(0) // price agreed with the publisher
+  publisherName   String?
+  publisherEmail  String?
+  publisherPhone  String?
+  tatDays         Int      @default(7)
+  category        String   @default("General")
+  country         String   @default("Kenya")
+  language        String   @default("English")
+  linkType        String   @default("guest_post")
+  vatApplies      Boolean  @default(false)
+  vatPercent      Float    @default(0)
+  agreed72h       Boolean  @default(false) // publisher accepted 72-hour payment
+  agreedFee       Boolean  @default(false) // buyer accepted the 5% platform fee
+  payMethod       String   @default("paypal") // paypal | bank | mpesa | other
+  payDetails      String?
+  notes           String?
+  status          String   @default("pending") // pending | approved | rejected
+  adminNote       String?
+  listingId       Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([buyerId])
+  @@index([status])
 }
 
 model PasswordReset {
