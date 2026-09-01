@@ -115,7 +115,7 @@ export function sendDepositReceipt(to: string, grossCents: number, netCents: num
     wrap(
       "Deposit received",
       `<p>We have received your deposit of <strong>${money(grossCents)}</strong>.</p>
-       <p>The full <strong>${money(netCents)}</strong> has been added to your wallet balance and is ready to use.</p>
+       <p>After the 5% service fee, <strong>${money(netCents)}</strong> has been added to your wallet balance and is ready to use.</p>
        <p>Your invoice will be emailed to you within 24 hours.</p>`
     )
   );
@@ -278,7 +278,7 @@ export function sendDepositAdmin(buyerEmail: string, grossCents: number, netCent
       `<p>A buyer topped up their wallet:</p>
        <p><strong>Buyer:</strong> ${esc(buyerEmail)}<br>
           <strong>Deposited:</strong> ${money(grossCents)}<br>
-          <strong>Credited to their wallet:</strong> ${money(netCents)}</p>
+          <strong>Credited after the 5% service fee:</strong> ${money(netCents)}</p>
        <p>Remember to send their invoice within 24 hours.</p>`
     )
   );

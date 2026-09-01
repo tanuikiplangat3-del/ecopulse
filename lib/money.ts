@@ -14,17 +14,17 @@ export function commissionRate(): number {
 }
 
 /**
- * No deposit fee. Buyers are credited every cent they pay in - VAT and service
- * costs are already built into the price shown on each listing, so charging
- * again at deposit time would be charging twice.
+ * Service fee charged on every wallet deposit (5%), covering card processing.
+ * Stripe's own cut is roughly 2.9% + $0.30 per payment, so this covers it with a
+ * little margin on larger deposits.
  */
-export const SERVICE_FEE_RATE = 0;
-export function depositFee(_grossCents: number): number {
-  return 0;
+export const SERVICE_FEE_RATE = 0.05;
+export function depositFee(grossCents: number): number {
+  return Math.round(grossCents * SERVICE_FEE_RATE);
 }
-/** The whole deposit lands in the wallet. */
+/** What lands in the wallet after the 5% service fee. */
 export function netDeposit(grossCents: number): number {
-  return grossCents;
+  return grossCents - depositFee(grossCents);
 }
 
 /**

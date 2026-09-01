@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
             }
           }
         } else if (tx.purpose === "topup") {
-          // No deposit fee: the buyer is credited every cent they paid in.
+          // Apply the 5% service fee: only the net amount lands in the wallet.
           const net = netDeposit(tx.amountCents);
           const fee = tx.amountCents - net;
           await prisma.$transaction([
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
                 kind: "topup",
                 amountCents: net,
                 method: "stripe",
-                note: `Deposit ${tx.amountCents} cents, credited in full`,
+                note: `Deposit gross ${tx.amountCents} cents, 5% fee ${fee} cents`,
               },
             }),
           ]);

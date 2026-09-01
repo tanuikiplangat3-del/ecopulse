@@ -25,7 +25,7 @@ export default async function TopupPage({ searchParams }: { searchParams: { [key
           </label>
           <button className="btn-primary" type="submit" disabled={!stripeEnabled()}>Top up</button>
         </form>
-        <p className="muted mt-3 text-xs">Minimum deposit $50.</p>
+        <p className="muted mt-3 text-xs">Minimum deposit $50. A 5% service fee applies to every deposit.</p>
       </div>
 
       {txs.length > 0 && (
