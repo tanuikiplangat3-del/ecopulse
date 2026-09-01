@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { centsFromUsd, money, MARKUP_TIERED } from "@/lib/money";
 import { checkDuplicate, archiveDearerDuplicates } from "@/lib/duplicates";
+import { normalizeCountry } from "@/lib/data";
 import { fetchDomainMetrics } from "@/lib/ahrefs";
 
 const q = (s: string) => encodeURIComponent(s);
@@ -67,7 +68,9 @@ export async function createListingAction(formData: FormData) {
   await makeListing(user.id, {
     domain,
     category: niches.length ? niches.join(",") : "General",
-    country,
+    // The picker already sends a canonical name; this only guards against a
+    // stale form or an older browser sending something slightly different.
+    country: normalizeCountry(country) || country,
     language,
     priceCents: centsFromUsd(priceUsd),
     linkType,
@@ -123,11 +126,24 @@ export async function bulkUploadAction(formData: FormData) {
   const toProcess = rows.slice(0, MAX_ROWS);
   const data: any[] = [];
   let skipped = 0;
+  // Country cells that we could not match to a real country, and how many rows
+  // used each one. Reported back so the sheet can be corrected, rather than
+  // quietly filing those sites under a country nobody will find them in.
+  const unmatchedCountries = new Map<string, number>();
+  let missingCountry = 0;
 
   for (const row of toProcess) {
     const raw = get(row, ["url", "site url", "website", "domain", "site name", "site"]);
     const priceStr = get(row, ["price", "price usd", "cost"]);
-    const country = get(row, ["country"]) || "Kenya";
+    // Sheets write countries every which way ("dr congo", "DRC", "Ivory Coast"),
+    // so map the cell onto the exact name the marketplace filter uses.
+    const rawCountry = get(row, ["country", "country name", "geo", "location", "market"]);
+    const matched = normalizeCountry(rawCountry);
+    if (!rawCountry) missingCountry++;
+    else if (!matched) unmatchedCountries.set(rawCountry, (unmatchedCountries.get(rawCountry) || 0) + 1);
+    // Blank cell -> Kenya, as before. An unrecognised name is kept as written so
+    // an admin can see exactly what the sheet said and fix it.
+    const country = matched || rawCountry || "Kenya";
     const language = get(row, ["language", "lang"]) || "English";
     const niche = get(row, ["niche", "niches", "category", "categories"]) || "General";
     const price = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
@@ -177,10 +193,22 @@ export async function bulkUploadAction(formData: FormData) {
 
   revalidatePath("/my-listings");
   revalidatePath("/marketplace");
+  // Name the unrecognised countries (worst offenders first) so the sheet can be
+  // fixed; the sites are still listed, they just will not show under a country.
+  const badCountries = Array.from(unmatchedCountries.entries()).sort((a, b) => b[1] - a[1]);
+  const countryNote = badCountries.length
+    ? ` ${badCountries.reduce((n, [, c]) => n + c, 0)} row(s) had a country we could not recognise: ` +
+      badCountries.slice(0, 8).map(([name, c]) => `"${name}" (${c})`).join(", ") +
+      (badCountries.length > 8 ? ` and ${badCountries.length - 8} more` : "") +
+      ". Those sites are listed but will not show under a country until the name is corrected."
+    : "";
+
   const note =
     `${created} website(s) uploaded.` +
     (archived ? ` ${archived} dearer duplicate listing(s) were removed from the marketplace.` : "") +
     (skipped ? ` ${skipped} row(s) were skipped (missing website or price).` : "") +
+    countryNote +
+    (missingCountry ? ` ${missingCountry} row(s) had no country column filled in and were set to Kenya.` : "") +
     (rows.length > MAX_ROWS ? ` Only the first ${MAX_ROWS} rows were read.` : "") +
     " Domain Rating and traffic are added shortly.";
   redirect(first ? `/payout?first=1` : `/my-listings?success=${q(note)}`);

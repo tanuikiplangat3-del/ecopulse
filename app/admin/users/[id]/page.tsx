@@ -3,12 +3,18 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { money, trafficShort } from "@/lib/money";
-import { StatusBadge } from "@/components/ui";
-import { deleteUserAction } from "@/app/actions/admin";
+import { StatusBadge, Flash } from "@/components/ui";
+import { deleteUserAction, deletePublisherListingsAction } from "@/app/actions/admin";
 
 export const metadata = { title: "Publisher" };
 
-export default async function AdminPublisherPage({ params }: { params: { id: string } }) {
+export default async function AdminPublisherPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   await requireRole("admin");
   const id = parseInt(params.id);
   const pub = await prisma.user.findUnique({ where: { id } });
@@ -33,6 +39,8 @@ export default async function AdminPublisherPage({ params }: { params: { id: str
           <button type="submit" className="btn-danger btn-sm">Delete this user</button>
         </form>
       </div>
+
+      <Flash searchParams={searchParams} />
 
       <div className="mb-6 grid gap-5 sm:grid-cols-3">
         <div className="card"><p className="muted text-sm">Websites</p><p className="text-3xl font-bold">{listings.length}</p></div>
@@ -73,6 +81,26 @@ export default async function AdminPublisherPage({ params }: { params: { id: str
           </tbody>
         </table>
       </div>
+
+      {pub.role === "publisher" && listings.length > 0 && (
+        <div className="card mt-6 border-red-500/40">
+          <h2 className="h3 mb-2">Remove all websites for this publisher</h2>
+          <p className="muted mb-4 text-sm">
+            Takes all {listings.length} website(s) above off the marketplace in one press, so you can
+            re-upload a corrected spreadsheet. Websites that already have orders on them are kept as
+            records and marked archived instead of deleted, so payment history is never lost. The
+            publisher account itself stays. This cannot be undone.
+          </p>
+          <form action={deletePublisherListingsAction} className="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="id" value={pub.id} />
+            <label className="field mb-0">
+              <span>Type DELETE to confirm</span>
+              <input className="input" name="confirm" placeholder="DELETE" autoComplete="off" required />
+            </label>
+            <button type="submit" className="btn-danger">Remove all {listings.length} website(s)</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

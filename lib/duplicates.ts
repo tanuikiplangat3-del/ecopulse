@@ -14,6 +14,13 @@ import { prisma } from "@/lib/prisma";
 /** Status used for a listing taken down because a cheaper duplicate exists. */
 export const STATUS_REPLACED = "replaced";
 
+/**
+ * Status used when an admin clears out a publisher's sites but the listing has
+ * orders on it. Same reasoning as above: the order record has to survive, so
+ * the listing is taken off the marketplace rather than deleted.
+ */
+export const STATUS_ARCHIVED = "archived";
+
 export type DuplicateCheck = {
   exists: boolean;
   cheapestCents: number | null; // lowest live price already listed for this domain

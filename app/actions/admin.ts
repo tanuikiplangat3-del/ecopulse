@@ -17,6 +17,8 @@ import {
 } from "@/lib/email";
 import { ahrefsEnabled } from "@/lib/ahrefs";
 import { refreshDueMetrics, REFRESH_AFTER_DAYS } from "@/lib/metrics";
+import { normalizeCountry } from "@/lib/data";
+import { STATUS_ARCHIVED } from "@/lib/duplicates";
 
 const q = (s: string) => encodeURIComponent(s);
 
@@ -157,6 +159,122 @@ export async function sendTestEmailAction() {
     redirect(`/admin?success=${q("Test email sent to " + ADMIN_NOTIFY + ". If it does not arrive, check the sending domain in Resend.")}`);
   }
   redirect(`/admin?error=${q("Resend rejected the message. Check the container logs for a line starting [email] REJECTED - it names the reason.")}`);
+}
+
+/**
+ * Super admin: clear out every website belonging to one publisher, in one press,
+ * so a bad spreadsheet can simply be re-uploaded.
+ *
+ * Sites that have never been ordered are deleted outright. Sites that carry
+ * orders are archived instead - Listing -> Order cascades in the database, so
+ * deleting one of those would delete the payment history with it. Archived sites
+ * leave the marketplace immediately, exactly like deleted ones, and re-uploading
+ * the same domain creates a fresh listing.
+ *
+ * Guarded by typing DELETE, because there is no undo.
+ */
+export async function deletePublisherListingsAction(formData: FormData) {
+  await requireRole("admin");
+  const id = parseInt(String(formData.get("id") || "0"));
+  const back = `/admin/users/${id}`;
+  const pub = await prisma.user.findUnique({ where: { id } });
+  if (!pub) redirect(`/admin/users?error=${q("Publisher not found.")}`);
+
+  const confirm = String(formData.get("confirm") || "").trim().toUpperCase();
+  if (confirm !== "DELETE")
+    redirect(`${back}?error=${q('Type DELETE in the box to remove every website for this publisher.')}`);
+
+  const listings = await prisma.listing.findMany({ where: { publisherId: id }, select: { id: true } });
+  const ids = listings.map((l) => l.id);
+  if (ids.length === 0) redirect(`${back}?error=${q("This publisher has no websites listed.")}`);
+
+  // Which of them have order history and therefore must be kept as records.
+  const orders = await prisma.order.findMany({
+    where: { listingId: { in: ids } },
+    select: { listingId: true },
+  });
+  const withOrders = new Set(orders.map((o) => o.listingId));
+  const removable = ids.filter((i) => !withOrders.has(i));
+
+  let archived = 0;
+  if (withOrders.size > 0) {
+    const res = await prisma.listing.updateMany({
+      where: { id: { in: Array.from(withOrders) } },
+      data: { status: STATUS_ARCHIVED },
+    });
+    archived = res.count;
+  }
+
+  let deleted = 0;
+  for (let i = 0; i < removable.length; i += 250) {
+    const res = await prisma.listing.deleteMany({ where: { id: { in: removable.slice(i, i + 250) } } });
+    deleted += res.count;
+  }
+
+  console.log(`[admin] cleared publisher ${id} (${pub!.email}): deleted ${deleted}, archived ${archived}`);
+
+  revalidatePath(back);
+  revalidatePath("/admin/listings");
+  revalidatePath("/marketplace");
+  const msg =
+    `Removed ${deleted + archived} website(s) for ${pub!.name}.` +
+    (archived
+      ? ` ${archived} had orders on them, so they were archived instead of deleted - the payment history stays intact and they are off the marketplace.`
+      : "") +
+    " You can re-upload the spreadsheet now.";
+  redirect(`${back}?success=${q(msg)}`);
+}
+
+/**
+ * Repair country names already in the database.
+ *
+ * Sites uploaded before country matching existed kept whatever the sheet said
+ * ("dr congo", "Ivory Coast"), which no country filter ever matched. This walks
+ * every distinct country value and rewrites the ones it recognises.
+ */
+export async function normalizeListingCountriesAction() {
+  await requireRole("admin");
+  const listings = await prisma.listing.findMany({ select: { country: true } });
+
+  const counts = new Map<string, number>();
+  for (const l of listings) counts.set(l.country, (counts.get(l.country) || 0) + 1);
+
+  let fixed = 0;
+  const renamed: string[] = [];
+  const unknown: [string, number][] = [];
+
+  for (const [raw, n] of Array.from(counts.entries())) {
+    const canonical = normalizeCountry(raw);
+    if (!canonical) {
+      if (raw.trim()) unknown.push([raw, n]);
+      continue;
+    }
+    if (canonical === raw) continue;
+    const res = await prisma.listing.updateMany({ where: { country: raw }, data: { country: canonical } });
+    fixed += res.count;
+    renamed.push(`"${raw}" -> ${canonical} (${res.count})`);
+  }
+
+  console.log(`[countries] fixed ${fixed} listing(s): ${renamed.join("; ") || "none"}`);
+
+  revalidatePath("/admin/listings");
+  revalidatePath("/marketplace");
+  revalidatePath("/");
+
+  if (fixed === 0 && unknown.length === 0)
+    redirect(`/admin/listings?success=${q("Every website already uses a recognised country name.")}`);
+
+  unknown.sort((a, b) => b[1] - a[1]);
+  const msg =
+    (fixed
+      ? `Corrected ${fixed} website(s): ${renamed.slice(0, 6).join(", ")}${renamed.length > 6 ? `, and ${renamed.length - 6} more` : ""}.`
+      : "No country names needed correcting.") +
+    (unknown.length
+      ? ` ${unknown.reduce((n, [, c]) => n + c, 0)} website(s) still use a name we do not recognise: ` +
+        unknown.slice(0, 8).map(([name, c]) => `"${name}" (${c})`).join(", ") +
+        (unknown.length > 8 ? ` and ${unknown.length - 8} more` : "") + "."
+      : "");
+  redirect(`/admin/listings?success=${q(msg)}`);
 }
 
 /** Super admin: permanently delete any user (and their sites/orders via cascade). */

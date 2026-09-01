@@ -56,6 +56,196 @@ export const COUNTRIES = [
   ...REST_OF_WORLD_COUNTRIES.filter((c) => !CORE_COUNTRIES.includes(c)).sort(),
 ];
 
+/* ---------------------------------------------------------------------------
+ * Matching country names that arrive from a spreadsheet
+ *
+ * Bulk uploads used to store whatever the sheet said, verbatim. A sheet saying
+ * "dr congo" was saved as "dr congo", which never matched the marketplace
+ * filter (it looks for "Democratic Republic of the Congo"), so those sites
+ * existed but could not be found by country.
+ *
+ * normalizeCountry() maps a free-text cell onto one of the 199 names above:
+ * case, accents, punctuation and "the" are ignored, and the alias table below
+ * covers the short forms and old names people actually type.
+ * ------------------------------------------------------------------------- */
+
+/** Strip everything that is only spelling, so "Côte d'Ivoire" == "cote divoire". */
+function countryKey(raw: string, dropParens = false): string {
+  return String(raw)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // drop accents: Cote -> Cote
+    .toLowerCase()
+    // A bracket can carry the answer ("Congo (Kinshasa)") or noise
+    // ("Kenya (Nairobi)"), so we read it both ways - see normalizeCountry.
+    .replace(/\(.*?\)/g, dropParens ? " " : " $& ")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/^the /, "")
+    .trim();
+}
+
+// Left side is what a sheet might say; right side is the canonical name.
+// Note on "Congo" on its own: ISO 3166 uses plain "Congo" for the Republic of
+// the Congo (Brazzaville), so that is what a bare "congo" maps to. Anything
+// mentioning "dr", "democratic" or "kinshasa" goes to the DRC.
+const COUNTRY_ALIASES: Record<string, string> = {
+  // Africa
+  "drc": "Democratic Republic of the Congo",
+  "dr congo": "Democratic Republic of the Congo",
+  "d r congo": "Democratic Republic of the Congo",
+  "dr c": "Democratic Republic of the Congo",
+  "congo dr": "Democratic Republic of the Congo",
+  "congo drc": "Democratic Republic of the Congo",
+  "congo kinshasa": "Democratic Republic of the Congo",
+  "democratic republic of congo": "Democratic Republic of the Congo",
+  "democratic republic congo": "Democratic Republic of the Congo",
+  "dem rep congo": "Democratic Republic of the Congo",
+  "congo democratic republic": "Democratic Republic of the Congo",
+  "congo democratic republic of": "Democratic Republic of the Congo",
+  "zaire": "Democratic Republic of the Congo",
+  "congo": "Republic of the Congo",
+  "congo brazzaville": "Republic of the Congo",
+  "republic of congo": "Republic of the Congo",
+  "congo republic": "Republic of the Congo",
+  "ivory coast": "Cote d'Ivoire",
+  "cote divoire": "Cote d'Ivoire",
+  "cote d ivoire": "Cote d'Ivoire",
+  "swaziland": "Eswatini",
+  "cape verde": "Cabo Verde",
+  "united republic of tanzania": "Tanzania",
+  "tanzania united republic of": "Tanzania",
+  "somaliland": "Somalia",
+  "burkina": "Burkina Faso",
+  "central african rep": "Central African Republic",
+  "sao tome": "Sao Tome and Principe",
+  "sao tome principe": "Sao Tome and Principe",
+  "s tome and principe": "Sao Tome and Principe",
+  "rsa": "South Africa",
+  "republic of south africa": "South Africa",
+  "arab republic of egypt": "Egypt",
+  "libyan arab jamahiriya": "Libya",
+  "guinea conakry": "Guinea",
+  "guinea bissao": "Guinea-Bissau",
+  "federal republic of nigeria": "Nigeria",
+  "republic of kenya": "Kenya",
+  "gambia": "Gambia",
+  // Europe
+  "uk": "United Kingdom",
+  "u k": "United Kingdom",
+  "gb": "United Kingdom",
+  "great britain": "United Kingdom",
+  "britain": "United Kingdom",
+  "england": "United Kingdom",
+  "scotland": "United Kingdom",
+  "wales": "United Kingdom",
+  "northern ireland": "United Kingdom",
+  "united kingdom of great britain and northern ireland": "United Kingdom",
+  "czech republic": "Czechia",
+  "czech": "Czechia",
+  "holland": "Netherlands",
+  "macedonia": "North Macedonia",
+  "fyrom": "North Macedonia",
+  "bosnia": "Bosnia and Herzegovina",
+  "bosnia herzegovina": "Bosnia and Herzegovina",
+  "vatican": "Vatican City",
+  "holy see": "Vatican City",
+  "russian federation": "Russia",
+  "republic of moldova": "Moldova",
+  "moldova republic of": "Moldova",
+  "turkiye": "Turkey",
+  "republic of ireland": "Ireland",
+  "eire": "Ireland",
+  "deutschland": "Germany",
+  "espana": "Spain",
+  "italia": "Italy",
+  // Americas
+  "usa": "United States",
+  "us": "United States",
+  "u s": "United States",
+  "u s a": "United States",
+  "america": "United States",
+  "united states of america": "United States",
+  "dominican rep": "Dominican Republic",
+  "st lucia": "Saint Lucia",
+  "st kitts": "Saint Kitts and Nevis",
+  "st kitts and nevis": "Saint Kitts and Nevis",
+  "st vincent": "Saint Vincent and the Grenadines",
+  "st vincent and grenadines": "Saint Vincent and the Grenadines",
+  "trinidad": "Trinidad and Tobago",
+  "antigua": "Antigua and Barbuda",
+  "bolivia plurinational state of": "Bolivia",
+  "venezuela bolivarian republic of": "Venezuela",
+  // Asia, Middle East, Oceania
+  "uae": "United Arab Emirates",
+  "u a e": "United Arab Emirates",
+  "emirates": "United Arab Emirates",
+  "dubai": "United Arab Emirates",
+  "abu dhabi": "United Arab Emirates",
+  "ksa": "Saudi Arabia",
+  "saudi": "Saudi Arabia",
+  "kingdom of saudi arabia": "Saudi Arabia",
+  "korea": "South Korea",
+  "republic of korea": "South Korea",
+  "korea south": "South Korea",
+  "korea rep": "South Korea",
+  "dprk": "North Korea",
+  "korea north": "North Korea",
+  "burma": "Myanmar",
+  "east timor": "Timor-Leste",
+  "lao pdr": "Laos",
+  "lao peoples democratic republic": "Laos",
+  "viet nam": "Vietnam",
+  "islamic republic of iran": "Iran",
+  "syrian arab republic": "Syria",
+  "brunei darussalam": "Brunei",
+  "hk": "Hong Kong",
+  "hong kong sar": "Hong Kong",
+  "palestinian territories": "Palestine",
+  "west bank": "Palestine",
+  "gaza": "Palestine",
+  "state of palestine": "Palestine",
+  "republic of china": "Taiwan",
+  "chinese taipei": "Taiwan",
+  "peoples republic of china": "China",
+  "nz": "New Zealand",
+  "aus": "Australia",
+  "png": "Papua New Guinea",
+  "papua": "Papua New Guinea",
+  "srilanka": "Sri Lanka",
+  "kyrgyz republic": "Kyrgyzstan",
+  "micronesia federated states of": "Micronesia",
+};
+
+// key -> canonical name, built once from the country list plus the aliases.
+const COUNTRY_BY_KEY: Record<string, string> = (() => {
+  const m: Record<string, string> = {};
+  for (const c of COUNTRIES) m[countryKey(c)] = c;
+  for (const [alias, canonical] of Object.entries(COUNTRY_ALIASES)) {
+    m[countryKey(alias)] = canonical;
+  }
+  return m;
+})();
+
+/**
+ * Turn a free-text country cell into one of the names in COUNTRIES.
+ * Returns null when nothing matches, so the caller can report it instead of
+ * silently filing the site under the wrong country.
+ */
+export function normalizeCountry(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  // Read the brackets first ("Congo (Kinshasa)" is the DRC), then ignore them
+  // ("Kenya (Nairobi)" is just Kenya).
+  const whole = COUNTRY_BY_KEY[countryKey(raw)] || COUNTRY_BY_KEY[countryKey(raw, true)];
+  if (whole) return whole;
+  // "Kenya / Uganda" or "Kenya - East Africa": take the first part we recognise.
+  for (const part of String(raw).split(/[,/|;\\]|\s+-\s+/)) {
+    const hit = COUNTRY_BY_KEY[countryKey(part)] || COUNTRY_BY_KEY[countryKey(part, true)];
+    if (hit) return hit;
+  }
+  return null;
+}
+
 export const CORE_NICHES = [
   "Business", "Technology", "Finance", "Sports", "Health",
 ];

@@ -8,6 +8,7 @@ import { requireRole, hashPassword } from "@/lib/auth";
 import { centsFromUsd, MARKUP_REQUESTED } from "@/lib/money";
 import { emailEnabled, sendSiteRequestAdmin, sendSiteRequestDecision } from "@/lib/email";
 import { archiveDearerDuplicates } from "@/lib/duplicates";
+import { normalizeCountry } from "@/lib/data";
 
 const q = (s: string) => encodeURIComponent(s);
 
@@ -24,7 +25,10 @@ export async function submitSiteRequestAction(formData: FormData) {
   const publisherPhone = String(formData.get("publisherPhone") || "").trim();
   const tatDays = parseInt(String(formData.get("tatDays") || "7")) || 7;
   const category = String(formData.get("category") || "General").trim();
-  const country = String(formData.get("country") || "").trim();
+  const rawCountry = String(formData.get("country") || "").trim();
+  // The picker sends a canonical name; normalising keeps the listing findable
+  // by country even if it ever sends a variant.
+  const country = normalizeCountry(rawCountry) || rawCountry;
   const language = String(formData.get("language") || "English").trim();
   const linkType = String(formData.get("linkType") || "guest_post");
   const vatApplies = String(formData.get("vatApplies") || "") === "yes";

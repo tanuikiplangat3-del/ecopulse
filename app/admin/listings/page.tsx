@@ -2,8 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { money, trafficShort } from "@/lib/money";
 import { StatusBadge, Flash } from "@/components/ui";
-import { approveListingAction, rejectListingAction, approveAllListingsAction, refreshListingMetricsAction } from "@/app/actions/admin";
+import { approveListingAction, rejectListingAction, approveAllListingsAction, refreshListingMetricsAction, normalizeListingCountriesAction } from "@/app/actions/admin";
 import { REFRESH_AFTER_DAYS } from "@/lib/metrics";
+import { normalizeCountry } from "@/lib/data";
 
 export default async function AdminListings({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   await requireRole("admin");
@@ -15,11 +16,24 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
     (l) => !l.metricsUpdatedAt || l.metricsUpdatedAt < cutoff
   ).length;
 
+  // Sites whose country does not match one of the names the marketplace filter
+  // uses - usually a spreadsheet spelling like "dr congo". They are listed but
+  // invisible to anyone browsing by country, so offer a one-press fix.
+  const oddCountry = listings.filter((l) => {
+    const canonical = normalizeCountry(l.country);
+    return !canonical || canonical !== l.country;
+  }).length;
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="h2">Listings</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          {oddCountry > 0 && (
+            <form action={normalizeListingCountriesAction}>
+              <button className="btn-ghost btn-sm" type="submit">Fix country names ({oddCountry})</button>
+            </form>
+          )}
           {staleCount > 0 && (
             <form action={refreshListingMetricsAction}>
               <button className="btn-ghost btn-sm" type="submit">Refresh DR &amp; traffic ({staleCount} due)</button>
