@@ -13,8 +13,9 @@ export function StatusBadge({ status }: { status: string }) {
     rejected: "badge-red",
     cancelled: "badge-red",
     closed: "badge-muted",
+    replaced: "badge-muted",
   };
-  const label = status.replace(/_/g, " ");
+  const label = status === "replaced" ? "replaced (cheaper listed)" : status.replace(/_/g, " ");
   return <span className={`badge ${map[status] || "badge-muted"}`}>{label}</span>;
 }
 

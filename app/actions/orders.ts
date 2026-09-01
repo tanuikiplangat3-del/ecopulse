@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireUser } from "@/lib/auth";
-import { buyerPrice, listingBaseCents, commissionRate } from "@/lib/money";
+import { buyerPrice, listingBaseCents, commissionRate, MARKUP_REQUESTED } from "@/lib/money";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
 import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin, sendOrderConfirmedEmails } from "@/lib/email";
 
@@ -140,6 +140,40 @@ export async function submitLiveAction(formData: FormData) {
   }
   revalidatePath("/orders");
   redirect(`/orders/${orderId}?success=${q("Live URL submitted. Waiting for buyer confirmation.")}`);
+}
+
+/**
+ * Buyer-requested sites have no publisher account to submit a live URL, so the
+ * BUYER supplies it and confirms publication themselves. That confirmation is
+ * what tells the admin the placement really happened - without it there is no
+ * live URL on the order and the publisher does not get paid.
+ */
+export async function buyerSubmitLiveAction(formData: FormData) {
+  const user = await requireRole("buyer");
+  const orderId = parseInt(String(formData.get("orderId") || "0"));
+  const liveUrl = String(formData.get("liveUrl") || "").trim();
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { listing: true },
+  });
+  if (!order || order.buyerId !== user.id) redirect(`/orders?error=${q("Not your order.")}`);
+  if (order!.listing.markupModel !== MARKUP_REQUESTED)
+    redirect(`/orders/${orderId}?error=${q("Only sites you requested are confirmed this way.")}`);
+  if (!["funded", "in_progress", "live"].includes(order!.status))
+    redirect(`/orders/${orderId}?error=${q("Fund the order before confirming the placement.")}`);
+  if (!/^https?:\/\//.test(liveUrl))
+    redirect(`/orders/${orderId}?error=${q("Enter the full live URL, starting with https://")}`);
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: "completed", liveUrl },
+  });
+  if (emailEnabled()) {
+    await sendLiveUrlAdmin(orderId, order!.listing.domain, liveUrl);
+  }
+  await notifyOrderConfirmed(orderId);
+  revalidatePath("/orders");
+  redirect(`/orders/${orderId}?success=${q("Thanks - the placement is confirmed and we will pay the publisher within 72 hours.")}`);
 }
 
 /** Buyer confirms the link is live -> completed. */

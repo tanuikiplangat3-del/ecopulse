@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, hashPassword } from "@/lib/auth";
 import { centsFromUsd, MARKUP_REQUESTED } from "@/lib/money";
 import { emailEnabled, sendSiteRequestAdmin, sendSiteRequestDecision } from "@/lib/email";
+import { archiveDearerDuplicates } from "@/lib/duplicates";
 
 const q = (s: string) => encodeURIComponent(s);
 
@@ -149,6 +150,9 @@ export async function approveSiteRequestAction(formData: FormData) {
     data: { status: "approved", listingId: listing.id },
   });
 
+  // If this domain was already listed, keep only the cheapest copy live.
+  const archived = await archiveDearerDuplicates(req!.domain);
+
   if (emailEnabled()) {
     const buyer = await prisma.user.findUnique({ where: { id: req!.buyerId } });
     if (buyer) {
@@ -163,7 +167,12 @@ export async function approveSiteRequestAction(formData: FormData) {
 
   revalidatePath("/admin/site-requests");
   revalidatePath("/marketplace");
-  redirect(`/admin/site-requests?success=${q(req!.domain + " approved and listed.")}`);
+  redirect(
+    `/admin/site-requests?success=${q(
+      req!.domain + " approved and listed." +
+        (archived ? ` ${archived} dearer duplicate listing(s) were removed from the marketplace.` : "")
+    )}`
+  );
 }
 
 /** Admin rejects a request, with an optional reason passed on to the buyer. */

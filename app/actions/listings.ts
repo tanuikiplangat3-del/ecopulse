@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-import { centsFromUsd, MARKUP_TIERED } from "@/lib/money";
+import { centsFromUsd, money, MARKUP_TIERED } from "@/lib/money";
+import { checkDuplicate, archiveDearerDuplicates } from "@/lib/duplicates";
 import { fetchDomainMetrics } from "@/lib/ahrefs";
 
 const q = (s: string) => encodeURIComponent(s);
@@ -60,6 +61,9 @@ export async function createListingAction(formData: FormData) {
   if (!country) redirect(`/new-listing?error=${q("Please choose a country.")}${first ? "&first=1" : ""}`);
   if (!priceUsd || priceUsd <= 0) redirect(`/new-listing?error=${q("Enter a valid price in USD.")}${first ? "&first=1" : ""}`);
 
+  const cleanDomain = domain.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/.*$/, "");
+  const dupe = await checkDuplicate(cleanDomain);
+
   await makeListing(user.id, {
     domain,
     category: niches.length ? niches.join(",") : "General",
@@ -70,9 +74,20 @@ export async function createListingAction(formData: FormData) {
     tatDays,
     description,
   });
+
+  // One listing per domain, at the lowest price. Dearer copies are archived,
+  // never deleted, so any order history on them survives.
+  const archived = await archiveDearerDuplicates(cleanDomain);
+
   revalidatePath("/my-listings");
   revalidatePath("/marketplace");
-  redirect(first ? `/payout?first=1` : `/my-listings?success=${q("Website added.")}`);
+  let note = "Website added.";
+  if (dupe.exists) {
+    note = archived
+      ? `${cleanDomain} was already listed at ${money(dupe.cheapestCents || 0)}. Yours is cheaper, so the dearer listing was removed from the marketplace.`
+      : `${cleanDomain} was already listed at ${money(dupe.cheapestCents || 0)}, which is cheaper than your price, so that one stays on the marketplace.`;
+  }
+  redirect(first ? `/payout?first=1` : `/my-listings?success=${q(note)}`);
 }
 
 /** Parse an uploaded spreadsheet (CSV or XLSX) and create one listing per row. */
@@ -154,10 +169,17 @@ export async function bulkUploadAction(formData: FormData) {
     created += res.count;
   }
 
+  // Keep only the cheapest copy of each domain that appeared in this upload.
+  let archived = 0;
+  for (const d of Array.from(new Set(data.map((r) => r.domain)))) {
+    archived += await archiveDearerDuplicates(d as string);
+  }
+
   revalidatePath("/my-listings");
   revalidatePath("/marketplace");
   const note =
     `${created} website(s) uploaded.` +
+    (archived ? ` ${archived} dearer duplicate listing(s) were removed from the marketplace.` : "") +
     (skipped ? ` ${skipped} row(s) were skipped (missing website or price).` : "") +
     (rows.length > MAX_ROWS ? ` Only the first ${MAX_ROWS} rows were read.` : "") +
     " Domain Rating and traffic are added shortly.";

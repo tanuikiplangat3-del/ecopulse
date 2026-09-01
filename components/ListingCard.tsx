@@ -90,7 +90,12 @@ export default function ListingCard({
               </svg>
             </a>
           </div>
-          <p className="muted text-sm">{listing.country}</p>
+          <p className="muted text-sm">
+            {listing.country}
+            {!!viewerId && listing.requestedById === viewerId && (
+              <span className="badge badge-yellow ml-2">your rate</span>
+            )}
+          </p>
         </div>
         <span className="badge badge-green whitespace-nowrap">{money(
             buyerPrice(listing.priceCents, listing.markupModel, {

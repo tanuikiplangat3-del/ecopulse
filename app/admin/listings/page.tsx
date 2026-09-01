@@ -46,7 +46,12 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
                   <a href={l.url || `https://${l.domain}`} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-wt-green hover:underline">
                     {l.domain} ↗
                   </a>
-                  <div className="muted text-xs">{l.country}</div>
+                  <div className="muted text-xs">
+                    {l.country}
+                    {l.markupModel === "requested" && (
+                      <span className="badge badge-yellow ml-2">requested</span>
+                    )}
+                  </div>
                 </td>
                 <td className="muted">{l.publisher.name}</td>
                 <td>{l.domainRating}</td>

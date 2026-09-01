@@ -138,11 +138,9 @@ model Invite {
   @@index([email])
 }
 
-/**
- * A buyer asking us to list a publisher they have negotiated with themselves.
- * On approval this becomes a Listing priced two ways: the requesting buyer pays
- * their negotiated price plus 5%, every other buyer pays the standard margin.
- */
+// A buyer asking us to list a publisher they have negotiated with themselves.
+// On approval this becomes a Listing priced two ways: the requesting buyer pays
+// their negotiated price plus 5%, every other buyer pays the standard margin.
 model SiteRequest {
   id              Int      @id @default(autoincrement())
   buyerId         Int
