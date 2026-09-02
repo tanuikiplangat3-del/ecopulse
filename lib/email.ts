@@ -208,8 +208,9 @@ export function sendSiteRequestAdmin(input: {
           <strong>Negotiated price:</strong> ${money(input.negotiatedCents)}<br>
           <strong>VAT:</strong> ${input.vatPercent > 0 ? input.vatPercent + "%" : "none"}</p>
        <p>Approve or reject it on the admin <strong>Site requests</strong> page. Approving lists it
-          immediately: this buyer will see their negotiated price plus 5%, and every other buyer
-          will see the standard margin.</p>`
+          immediately: this buyer will see half the standard margin on their first 3 orders, and
+          every other buyer will see the standard margin. If we already list this domain, it is
+          created at standard pricing for everyone.</p>`
     )
   );
 }
@@ -229,8 +230,9 @@ export function sendSiteRequestDecision(input: {
       wrap(
         "Your requested site is live",
         `<p><strong>${esc(input.domain)}</strong> has been reviewed and added to the marketplace.</p>
-         <p>You will see it at your negotiated price plus the 5% platform service fee. You can order
-            a placement on it from the marketplace now.</p>`
+         <p>On your first 3 orders you pay your negotiated price plus half our standard margin.
+            After that it prices at the standard rate, like any other site. You can order a
+            placement on it from the marketplace now.</p>`
       )
     );
   }

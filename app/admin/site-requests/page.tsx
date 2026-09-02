@@ -44,7 +44,7 @@ export default async function AdminSiteRequests({
             const base = listingBaseCents(r.negotiatedCents, r.vatPercent);
             const requesterPays = buyerPrice(r.negotiatedCents, MARKUP_REQUESTED, {
               vatPercent: r.vatPercent,
-              isRequester: true,
+              requesterRate: true,
             });
             const othersPay = buyerPrice(r.negotiatedCents, MARKUP_REQUESTED, { vatPercent: r.vatPercent });
             return (
@@ -77,7 +77,7 @@ export default async function AdminSiteRequests({
                     <p className="text-lg font-bold">{r.vatApplies ? money(base - r.negotiatedCents) : "—"}</p>
                   </div>
                   <div>
-                    <p className="muted text-xs">This buyer pays</p>
+                    <p className="muted text-xs">This buyer pays (first 3 orders)</p>
                     <p className="text-lg font-bold text-wt-green">{money(requesterPays)}</p>
                   </div>
                   <div>

@@ -8,6 +8,7 @@ import { Flash } from "@/components/ui";
 import { NICHES, COUNTRIES, LANGUAGES } from "@/lib/data";
 import { centsFromUsd, filterFloorFromBuyer, filterCeilingFromBuyer } from "@/lib/money";
 import { getViewerAccess, maskListing, FREE_PREVIEW_COUNT } from "@/lib/access";
+import { requesterRateListingIds } from "@/lib/requester";
 import { one } from "@/lib/util";
 
 export const dynamic = "force-dynamic";
@@ -72,11 +73,15 @@ export default async function MarketplacePage({
     });
   }
 
+  // Sites this buyer brought us and still has reduced-rate orders left on.
+  // One query for the whole grid.
+  const myRate = await requesterRateListingIds(user?.id, listings as any);
+
   // Redact anything past the free preview before it reaches the browser.
   const firstIndexOnPage = user ? (page - 1) * PAGE_SIZE : 0;
   const rows = listings.map((l: any, i: number) => {
     const locked = !access.unlocked && firstIndexOnPage + i >= FREE_PREVIEW_COUNT;
-    return { listing: locked ? maskListing(l) : l, locked };
+    return { listing: locked ? maskListing(l) : l, locked, requesterRate: myRate.has(l.id) };
   });
   const lockedCount = rows.filter((r) => r.locked).length;
 
@@ -138,7 +143,7 @@ export default async function MarketplacePage({
         <>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {rows.map((r, i) => (
-              <ListingCard key={r.listing.id ?? i} listing={r.listing} locked={r.locked} viewerId={user?.id} />
+              <ListingCard key={r.listing.id ?? i} listing={r.listing} locked={r.locked} requesterRate={r.requesterRate} />
             ))}
           </div>
 

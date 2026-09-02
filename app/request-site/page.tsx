@@ -26,8 +26,8 @@ export default async function RequestSitePage({
       <h1 className="h2 mb-1">Request a site</h1>
       <p className="muted mb-6">
         Negotiated directly with a publisher? Send us the details and we&apos;ll add their site to
-        the marketplace. You keep your negotiated price plus a 5% platform service fee &mdash; other
-        buyers see our standard pricing.
+        the marketplace. For your first 3 orders on it you pay <strong>half our standard
+        margin</strong> &mdash; every other buyer, and you after that, pays the standard rate.
       </p>
       <Flash searchParams={searchParams} />
 
@@ -133,8 +133,10 @@ export default async function RequestSitePage({
         <label className="mb-4 flex items-start gap-3 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
           <input type="checkbox" name="agreedFee" className="mt-1" required />
           <span>
-            I agree to a <strong>5% platform service fee</strong> on top of my negotiated price for
-            orders I place on this site.
+            I understand that I pay my negotiated price plus <strong>half the standard platform
+            margin</strong> on my first 3 orders on this site (minimum $25 per order, which covers
+            paying the publisher), and the standard rate after that. If we already list this domain,
+            standard pricing applies from the start.
           </span>
         </label>
 

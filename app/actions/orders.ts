@@ -6,6 +6,7 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireUser } from "@/lib/auth";
 import { buyerPrice, listingBaseCents, commissionRate, MARKUP_REQUESTED } from "@/lib/money";
+import { hasRequesterRate } from "@/lib/requester";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
 import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin, sendOrderConfirmedEmails } from "@/lib/email";
 
@@ -44,11 +45,13 @@ export async function placeOrderAction(formData: FormData) {
   if (img === "too_big") redirect(`/listing/${listingId}?error=${q("Your image is larger than 4MB. Please upload a smaller image.")}`);
 
   // Requested sites are priced per buyer: the buyer who negotiated the deal pays
-  // their price + 5%, everyone else pays the standard margin. VAT (if any) is
-  // added on top and passed through to the publisher.
+  // half the normal margin for their first few orders, everyone else pays the
+  // standard margin. VAT (if any) is added on top and passed to the publisher.
+  // This is the call that actually takes money, so the allowance is checked here
+  // rather than trusted from whatever page the buyer came from.
   const amount = buyerPrice(listing!.priceCents, listing!.markupModel, {
     vatPercent: listing!.vatPercent,
-    isRequester: listing!.requestedById === user.id,
+    requesterRate: await hasRequesterRate(user.id, listing!),
   });
   const payout = listingBaseCents(listing!.priceCents, listing!.vatPercent);
   const order = await prisma.order.create({

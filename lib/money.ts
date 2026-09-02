@@ -76,8 +76,32 @@ export const MARKUP_TIERED = "tiered";
 export const MARKUP_FLAT30 = "flat30";
 export const MARKUP_REQUESTED = "requested";
 
-/** Platform fee charged to the buyer who negotiated a site themselves. */
-export const REQUESTER_FEE_RATE = 0.05;
+/* ---------------------------------------------------------------------------
+ * Buyer-requested sites
+ *
+ * A buyer who brings us a publisher we do not carry gets a discount, not a way
+ * round the marketplace. They pay HALF the margin everyone else pays, so the
+ * reward scales with the band and always leaves a real operating margin:
+ *
+ *   $100 site  -> others $145.00, requester $122.50
+ *   $300 site  -> others $375.00, requester $337.50
+ *
+ * The discount runs out after REQUESTER_ORDER_LIMIT orders on that listing;
+ * after that they pay the standard rate like anyone else.
+ *
+ * MIN_PLATFORM_FEE_CENTS applies to requested sites only. Their publishers have
+ * no account here, so every payout is a manual PayPal or bank transfer - on a
+ * cheap site the transfer fee alone can exceed the margin.
+ * ------------------------------------------------------------------------- */
+
+/** The requester pays this share of the normal margin. */
+export const REQUESTER_MARGIN_SHARE = 0.5;
+
+/** Never earn less than this on a requested site, whoever is buying. */
+export const MIN_PLATFORM_FEE_CENTS = 2500; // $25
+
+/** How many orders one requester gets at their reduced rate, per listing. */
+export const REQUESTER_ORDER_LIMIT = 3;
 
 /**
  * The publisher's price with VAT added. VAT is charged on top and passed
@@ -96,22 +120,26 @@ export function listingBaseCents(publisherCents: number, vatPercent?: number | n
  * Three rules are live at once:
  *   flat30    - sites listed before tiered pricing: publisher price + $30, for life
  *   tiered    - everything listed since: +45% / +25% by band
- *   requested - a site a buyer negotiated themselves. That buyer pays their
- *               negotiated price + 5%; every other buyer pays the tiered margin.
+ *   requested - a site a buyer negotiated themselves. That buyer pays half the
+ *               normal margin for their first few orders; everyone else, and
+ *               that buyer afterwards, pays the standard margin.
  *
- * `isRequester` must only ever be true for the buyer whose id matches the
- * listing's requestedById - it is what separates their price from everyone else's.
+ * `requesterRate` is NOT simply "is this the requester". The caller must have
+ * already checked that they are the requester AND still have orders left at the
+ * reduced rate - see lib/requester.ts, which is the only correct source for it.
  */
 export function buyerPrice(
   publisherCents: number,
   markupModel?: string | null,
-  opts?: { vatPercent?: number | null; isRequester?: boolean }
+  opts?: { vatPercent?: number | null; requesterRate?: boolean }
 ): number {
   const base = listingBaseCents(publisherCents, opts?.vatPercent);
 
   if (markupModel === MARKUP_REQUESTED) {
-    if (opts?.isRequester) return Math.round(base * (1 + REQUESTER_FEE_RATE));
-    return Math.round(base * (1 + markupRate(base)));
+    const standardFee = Math.round(base * markupRate(base));
+    const fee = opts?.requesterRate ? Math.round(standardFee * REQUESTER_MARGIN_SHARE) : standardFee;
+    // The floor covers the manual payout these sites always need.
+    return base + Math.max(fee, MIN_PLATFORM_FEE_CENTS);
   }
   if (markupModel === MARKUP_TIERED) {
     return Math.round(base * (1 + markupRate(base)));

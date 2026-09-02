@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole, hashPassword } from "@/lib/auth";
-import { centsFromUsd, MARKUP_REQUESTED } from "@/lib/money";
+import { centsFromUsd, MARKUP_REQUESTED, MARKUP_TIERED } from "@/lib/money";
 import { emailEnabled, sendSiteRequestAdmin, sendSiteRequestDecision } from "@/lib/email";
 import { archiveDearerDuplicates } from "@/lib/duplicates";
 import { normalizeCountry } from "@/lib/data";
@@ -54,7 +54,7 @@ export async function submitSiteRequestAction(formData: FormData) {
   if (!agreed72h)
     redirect(`${back}?error=${q("We can only list a publisher who accepts payment within 72 hours of the buyer confirming the link.")}`);
   if (!agreedFee)
-    redirect(`${back}?error=${q("Please accept the 5% platform service fee to continue.")}`);
+    redirect(`${back}?error=${q("Please accept the platform pricing terms to continue.")}`);
 
   const req = await prisma.siteRequest.create({
     data: {
@@ -129,6 +129,19 @@ export async function approveSiteRequestAction(formData: FormData) {
     redirect(`/admin/site-requests?error=${q("That request is not awaiting review.")}`);
 
   const publisherId = await externalPublisherId();
+
+  // The reduced rate is a reward for bringing us inventory we do not already
+  // carry. If this domain is already on the marketplace, listing it as
+  // "requested" would let any buyer convert an existing site into a discounted
+  // one for themselves - and, because the cheapest copy wins, take our own
+  // listing off the marketplace in the process. So an already-listed domain is
+  // created as an ordinary tiered listing at the negotiated price: everyone,
+  // including the requester, pays the standard margin.
+  const alreadyListed = await prisma.listing.count({
+    where: { domain: req!.domain, status: "approved" },
+  });
+  const isNewInventory = alreadyListed === 0;
+
   const listing = await prisma.listing.create({
     data: {
       publisherId,
@@ -142,8 +155,8 @@ export async function approveSiteRequestAction(formData: FormData) {
       tatDays: req!.tatDays,
       description: req!.notes || "",
       status: "approved", // approving the request lists it immediately
-      markupModel: MARKUP_REQUESTED,
-      requestedById: req!.buyerId,
+      markupModel: isNewInventory ? MARKUP_REQUESTED : MARKUP_TIERED,
+      requestedById: isNewInventory ? req!.buyerId : null,
       siteRequestId: req!.id,
       vatPercent: req!.vatPercent,
     },
@@ -174,6 +187,9 @@ export async function approveSiteRequestAction(formData: FormData) {
   redirect(
     `/admin/site-requests?success=${q(
       req!.domain + " approved and listed." +
+        (isNewInventory
+          ? " The buyer gets their negotiated rate on their first 3 orders."
+          : " We already carry this domain, so it was listed at standard pricing - the buyer does not get a discounted rate on a site we already had.") +
         (archived ? ` ${archived} dearer duplicate listing(s) were removed from the marketplace.` : "")
     )}`
   );

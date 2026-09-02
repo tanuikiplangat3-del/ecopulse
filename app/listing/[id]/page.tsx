@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { money, buyerPrice, trafficShort } from "@/lib/money";
 import { linkTypeLabel } from "@/lib/data";
+import { requesterOrdersLeft } from "@/lib/requester";
 import { placeOrderAction } from "@/app/actions/orders";
 import { Flash } from "@/components/ui";
 
@@ -35,6 +36,11 @@ export default async function ListingPage({
   }
 
   const niches = listing.category.split(",").filter(Boolean);
+
+  // Buyer-requested sites: does this viewer still get the rate they negotiated,
+  // and how many of those orders are left?
+  const ordersLeft = await requesterOrdersLeft(user?.id, listing!);
+  const requesterRate = ordersLeft > 0;
 
   return (
     <div className="grid gap-8 lg:grid-cols-3">
@@ -79,12 +85,20 @@ export default async function ListingPage({
       <div>
         <div className="card sticky top-20">
           <p className="muted text-sm">Price</p>
-          <p className="mb-4 text-3xl font-bold text-wt-green">{money(
+          <p className="mb-1 text-3xl font-bold text-wt-green">{money(
             buyerPrice(listing.priceCents, listing.markupModel, {
               vatPercent: listing.vatPercent,
-              isRequester: !!user && listing.requestedById === user.id,
+              requesterRate,
             })
           )}</p>
+          {requesterRate && (
+            <p className="muted mb-4 text-xs">
+              Your negotiated rate, on {ordersLeft} more order{ordersLeft === 1 ? "" : "s"}. After
+              that this site prices at the standard rate of{" "}
+              {money(buyerPrice(listing.priceCents, listing.markupModel, { vatPercent: listing.vatPercent }))}.
+            </p>
+          )}
+          {!requesterRate && <div className="mb-4" />}
           <Flash searchParams={searchParams} />
 
           {!user && (

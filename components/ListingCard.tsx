@@ -20,11 +20,14 @@ type L = {
 export default function ListingCard({
   listing,
   locked = false,
-  viewerId,
+  requesterRate = false,
 }: {
   listing: L;
   locked?: boolean;
-  viewerId?: number | null;
+  // True only when this viewer is the buyer who brought us this publisher AND
+  // still has reduced-rate orders left. Worked out in lib/requester.ts - never
+  // by comparing requestedById here, or the discount would never expire.
+  requesterRate?: boolean;
 }) {
   const niches = listing.category.split(",").filter(Boolean).slice(0, 3);
   const siteUrl = listing.url || `https://${listing.domain}`;
@@ -92,15 +95,13 @@ export default function ListingCard({
           </div>
           <p className="muted text-sm">
             {listing.country}
-            {!!viewerId && listing.requestedById === viewerId && (
-              <span className="badge badge-yellow ml-2">your rate</span>
-            )}
+            {requesterRate && <span className="badge badge-yellow ml-2">your rate</span>}
           </p>
         </div>
         <span className="badge badge-green whitespace-nowrap">{money(
             buyerPrice(listing.priceCents, listing.markupModel, {
               vatPercent: listing.vatPercent,
-              isRequester: !!viewerId && listing.requestedById === viewerId,
+              requesterRate,
             })
           )}</span>
       </div>
