@@ -17,8 +17,8 @@ export default function TermsPage() {
           <p>Registered Address: Dubai, United Arab Emirates.</p>
           <p>
             Contact:{" "}
-            <a href="mailto:legal@welcometomorrow.io" className="text-wt-green hover:underline">
-              legal@welcometomorrow.io
+            <a href="mailto:hello@welcometomorrow.io" className="text-wt-green hover:underline">
+              hello@welcometomorrow.io
             </a>
           </p>
         </>

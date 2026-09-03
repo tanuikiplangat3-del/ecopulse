@@ -16,8 +16,8 @@ export default function RefundPolicyPage() {
           <p>LinkTomorrow Marketplace</p>
           <p>
             For financial inquiries, contact:{" "}
-            <a href="mailto:billing@welcometomorrow.io" className="text-wt-green hover:underline">
-              billing@welcometomorrow.io
+            <a href="mailto:hello@welcometomorrow.io" className="text-wt-green hover:underline">
+              hello@welcometomorrow.io
             </a>
           </p>
         </>
