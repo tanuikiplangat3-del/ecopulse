@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const SITE = "https://welcometomorrow.io";
 const LOGO = "https://welcometomorrow.io/wp-content/uploads/2025/07/WT-logo-white.svg";
 
@@ -121,7 +123,11 @@ export default function Footer() {
 
         <div className="mt-14 flex flex-col items-start justify-between gap-3 border-t border-white/10 pt-6 text-sm text-white/50 sm:flex-row sm:items-center">
           <span>Copyright © {new Date().getFullYear()} Welcome Tomorrow, all rights reserved</span>
-          <a href={`${SITE}/legal-notice/`} className="hover:text-white">Legal information</a>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <Link href="/terms" className="hover:text-white">Terms of Service</Link>
+            <Link href="/refund" className="hover:text-white">Refund Policy</Link>
+            <a href={`${SITE}/legal-notice/`} className="hover:text-white">Legal information</a>
+          </div>
         </div>
       </div>
     </footer>
