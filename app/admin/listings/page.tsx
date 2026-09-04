@@ -5,10 +5,13 @@ import { StatusBadge, Flash } from "@/components/ui";
 import { approveListingAction, rejectListingAction, approveAllListingsAction, refreshListingMetricsAction, normalizeListingCountriesAction } from "@/app/actions/admin";
 import { REFRESH_AFTER_DAYS } from "@/lib/metrics";
 import { normalizeCountry } from "@/lib/data";
+import { countConflicts } from "@/lib/duplicates";
+import Link from "next/link";
 
 export default async function AdminListings({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   await requireRole("admin");
   const listings = await prisma.listing.findMany({ include: { publisher: true }, orderBy: [{ status: "asc" }, { createdAt: "desc" }] });
+  const conflictCount = await countConflicts();
   const pendingCount = listings.filter((l) => l.status === "pending").length;
   // Metrics refresh themselves every REFRESH_AFTER_DAYS days; this counts what is due now.
   const cutoff = new Date(Date.now() - REFRESH_AFTER_DAYS * 86400_000);
@@ -48,6 +51,24 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
       </div>
       <Flash searchParams={searchParams} />
 
+      {conflictCount > 0 && (
+        <Link
+          href="/admin/conflicts"
+          className="card mb-5 flex items-center justify-between border-wt-yellow/40 hover:border-wt-yellow"
+        >
+          <div>
+            <p className="font-semibold text-wt-yellow">
+              {conflictCount} website{conflictCount === 1 ? "" : "s"} waiting on a price decision
+            </p>
+            <p className="muted text-sm">
+              Domains we already list were submitted again. Compare the prices and choose which one
+              the marketplace keeps.
+            </p>
+          </div>
+          <span className="btn-ghost btn-sm">Review conflicts →</span>
+        </Link>
+      )}
+
       <div className="card overflow-x-auto">
         <table className="table-wt">
           <thead>
@@ -74,8 +95,15 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
                 <td><StatusBadge status={l.status} /></td>
                 <td>
                   <div className="flex gap-2">
-                    {l.status !== "approved" && (
-                      <form action={approveListingAction}><input type="hidden" name="id" value={l.id} /><button className="btn-primary btn-sm" type="submit">Approve</button></form>
+                    {/* A conflict must be settled against its rival, not simply
+                        approved here - approving it directly would leave two
+                        listings live on the same domain. */}
+                    {l.status === "conflict" ? (
+                      <Link href="/admin/conflicts" className="btn-accent btn-sm">Compare prices</Link>
+                    ) : (
+                      l.status !== "approved" && (
+                        <form action={approveListingAction}><input type="hidden" name="id" value={l.id} /><button className="btn-primary btn-sm" type="submit">Approve</button></form>
+                      )
                     )}
                     {l.status !== "rejected" && (
                       <form action={rejectListingAction}><input type="hidden" name="id" value={l.id} /><button className="btn-danger btn-sm" type="submit">Reject</button></form>

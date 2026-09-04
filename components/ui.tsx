@@ -15,13 +15,16 @@ export function StatusBadge({ status }: { status: string }) {
     closed: "badge-muted",
     replaced: "badge-muted",
     archived: "badge-muted",
+    conflict: "badge-yellow",
   };
   const label =
     status === "replaced"
       ? "replaced (cheaper listed)"
       : status === "archived"
         ? "archived (has orders)"
-        : status.replace(/_/g, " ");
+        : status === "conflict"
+          ? "conflict - awaiting review"
+          : status.replace(/_/g, " ");
   return <span className={`badge ${map[status] || "badge-muted"}`}>{label}</span>;
 }
 

@@ -407,3 +407,41 @@ export function sendPublisherApplicationAdmin(input: { name: string; email: stri
     input.email
   );
 }
+
+/**
+ * Tell a publisher how a duplicate-domain conflict was settled - whether their
+ * price replaced the one we were showing, or we stayed with the existing one.
+ */
+export function sendListingConflictDecision(input: {
+  to: string;
+  domain: string;
+  kept: boolean; // true = their listing is now the live one
+  theirPriceCents: number;
+  livePriceCents: number | null;
+}) {
+  if (input.kept) {
+    return send(
+      input.to,
+      `${input.domain} is now live on Link Tomorrow`,
+      wrap(
+        "Your listing is live",
+        `<p><strong>${esc(input.domain)}</strong> was already on the marketplace, so our team compared
+            the two prices.</p>
+         <p>Yours won. <strong>${esc(input.domain)}</strong> is now listed at
+            <strong>${money(input.theirPriceCents)}</strong> and is available to buyers.</p>`
+      )
+    );
+  }
+  return send(
+    input.to,
+    `We already list ${input.domain}`,
+    wrap(
+      "We are keeping the current listing",
+      `<p>Thank you for submitting <strong>${esc(input.domain)}</strong>. It is already on the
+          marketplace${input.livePriceCents !== null ? ` at <strong>${money(input.livePriceCents)}</strong>` : ""},
+          and after comparing the two we are staying with the existing listing.</p>
+       <p>Your price was ${money(input.theirPriceCents)}. If you can improve on the price we are
+          currently showing, submit the site again and we will review it.</p>`
+    )
+  );
+}

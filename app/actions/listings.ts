@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { centsFromUsd, money, MARKUP_TIERED } from "@/lib/money";
-import { checkDuplicate, archiveDearerDuplicates } from "@/lib/duplicates";
+import { checkDuplicate, liveDomains, STATUS_CONFLICT } from "@/lib/duplicates";
 import { normalizeCountry } from "@/lib/data";
 import { fetchDomainMetrics } from "@/lib/ahrefs";
 
@@ -16,7 +16,7 @@ const autoApprove = () => (process.env.AUTO_APPROVE_LISTINGS || "true") === "tru
 async function makeListing(publisherId: number, data: {
   domain: string; url?: string; category: string; country: string;
   language?: string; priceCents: number; linkType?: string; tatDays?: number; description?: string;
-}, opts: { skipAhrefs?: boolean } = {}) {
+}, opts: { skipAhrefs?: boolean; status?: string } = {}) {
   const domain = data.domain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   const url = (data.url || `https://${domain}`).trim();
   // Auto-fetch DR + monthly traffic from Ahrefs (fails soft to 0).
@@ -41,7 +41,7 @@ async function makeListing(publisherId: number, data: {
       priceCents: data.priceCents,
       tatDays: data.tatDays || 7,
       description: data.description || "",
-      status: autoApprove() ? "approved" : "pending",
+      status: opts.status || (autoApprove() ? "approved" : "pending"),
     },
   });
 }
@@ -76,20 +76,18 @@ export async function createListingAction(formData: FormData) {
     linkType,
     tatDays,
     description,
+  }, {
+    // Already on the marketplace? Hold it for review rather than publishing it
+    // or quietly taking anyone down. An admin compares the two prices and
+    // decides, on Admin -> Conflicts.
+    status: dupe.exists ? STATUS_CONFLICT : undefined,
   });
-
-  // One listing per domain, at the lowest price. Dearer copies are archived,
-  // never deleted, so any order history on them survives.
-  const archived = await archiveDearerDuplicates(cleanDomain);
 
   revalidatePath("/my-listings");
   revalidatePath("/marketplace");
-  let note = "Website added.";
-  if (dupe.exists) {
-    note = archived
-      ? `${cleanDomain} was already listed at ${money(dupe.cheapestCents || 0)}. Yours is cheaper, so the dearer listing was removed from the marketplace.`
-      : `${cleanDomain} was already listed at ${money(dupe.cheapestCents || 0)}, which is cheaper than your price, so that one stays on the marketplace.`;
-  }
+  const note = dupe.exists
+    ? `${cleanDomain} is already on the marketplace at ${money(dupe.cheapestCents || 0)}. Your listing has been sent to our team to review - we will let you know which price we go with.`
+    : "Website added.";
   redirect(first ? `/payout?first=1` : `/my-listings?success=${q(note)}`);
 }
 
@@ -178,17 +176,27 @@ export async function bulkUploadAction(formData: FormData) {
     redirect(`/bulk-upload?error=${q("No usable rows found. Each row needs a website and a price above 0.")}${first ? "&first=1" : ""}`);
   }
 
+  // Any row whose domain is already on the marketplace is held for review rather
+  // than published. One query for the whole sheet, not one per row. A domain
+  // repeated inside the same sheet is also held from the second occurrence on,
+  // so an upload cannot quietly list the same site twice.
+  const alreadyLive = await liveDomains(Array.from(new Set(data.map((r) => r.domain as string))));
+  const seenInSheet = new Set<string>();
+  let conflicts = 0;
+  for (const row of data) {
+    const d = row.domain as string;
+    if (alreadyLive.has(d) || seenInSheet.has(d)) {
+      row.status = STATUS_CONFLICT;
+      conflicts++;
+    }
+    seenInSheet.add(d);
+  }
+
   // Insert in chunks so a very large sheet never builds one oversized statement.
   let created = 0;
   for (let i = 0; i < data.length; i += 250) {
     const res = await prisma.listing.createMany({ data: data.slice(i, i + 250) });
     created += res.count;
-  }
-
-  // Keep only the cheapest copy of each domain that appeared in this upload.
-  let archived = 0;
-  for (const d of Array.from(new Set(data.map((r) => r.domain)))) {
-    archived += await archiveDearerDuplicates(d as string);
   }
 
   revalidatePath("/my-listings");
@@ -205,7 +213,9 @@ export async function bulkUploadAction(formData: FormData) {
 
   const note =
     `${created} website(s) uploaded.` +
-    (archived ? ` ${archived} dearer duplicate listing(s) were removed from the marketplace.` : "") +
+    (conflicts
+      ? ` ${conflicts} were already on the marketplace and are being reviewed by our team - we will confirm which price we go with.`
+      : "") +
     (skipped ? ` ${skipped} row(s) were skipped (missing website or price).` : "") +
     countryNote +
     (missingCountry ? ` ${missingCountry} row(s) had no country column filled in and were set to Kenya.` : "") +

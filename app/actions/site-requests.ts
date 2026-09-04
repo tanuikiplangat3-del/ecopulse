@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, hashPassword } from "@/lib/auth";
 import { centsFromUsd, MARKUP_REQUESTED, MARKUP_TIERED } from "@/lib/money";
 import { emailEnabled, sendSiteRequestAdmin, sendSiteRequestDecision } from "@/lib/email";
-import { archiveDearerDuplicates } from "@/lib/duplicates";
+import { STATUS_CONFLICT } from "@/lib/duplicates";
 import { normalizeCountry } from "@/lib/data";
 
 const q = (s: string) => encodeURIComponent(s);
@@ -154,7 +154,10 @@ export async function approveSiteRequestAction(formData: FormData) {
       priceCents: req!.negotiatedCents,
       tatDays: req!.tatDays,
       description: req!.notes || "",
-      status: "approved", // approving the request lists it immediately
+      // A brand-new domain goes live immediately. One we already carry is held
+      // as a conflict so an admin can compare the two prices on Admin ->
+      // Conflicts before anything changes on the marketplace.
+      status: isNewInventory ? "approved" : STATUS_CONFLICT,
       markupModel: isNewInventory ? MARKUP_REQUESTED : MARKUP_TIERED,
       requestedById: isNewInventory ? req!.buyerId : null,
       siteRequestId: req!.id,
@@ -166,9 +169,6 @@ export async function approveSiteRequestAction(formData: FormData) {
     where: { id },
     data: { status: "approved", listingId: listing.id },
   });
-
-  // If this domain was already listed, keep only the cheapest copy live.
-  const archived = await archiveDearerDuplicates(req!.domain);
 
   if (emailEnabled()) {
     const buyer = await prisma.user.findUnique({ where: { id: req!.buyerId } });
@@ -186,11 +186,9 @@ export async function approveSiteRequestAction(formData: FormData) {
   revalidatePath("/marketplace");
   redirect(
     `/admin/site-requests?success=${q(
-      req!.domain + " approved and listed." +
-        (isNewInventory
-          ? " The buyer gets their negotiated rate on their first 3 orders."
-          : " We already carry this domain, so it was listed at standard pricing - the buyer does not get a discounted rate on a site we already had.") +
-        (archived ? ` ${archived} dearer duplicate listing(s) were removed from the marketplace.` : "")
+      isNewInventory
+        ? req!.domain + " approved and listed. The buyer gets their negotiated rate on their first 3 orders."
+        : req!.domain + " is already on the marketplace, so it was NOT listed yet - it is waiting on Admin > Conflicts for you to compare the two prices. It also carries standard pricing rather than the discounted requester rate, because we already had this domain."
     )}`
   );
 }
