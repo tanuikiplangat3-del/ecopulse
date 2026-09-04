@@ -26,12 +26,12 @@ export function LegalShell({
       </Link>
 
       <h1 className="h2 mb-3 mt-4 text-white">{title}</h1>
-      <p className="mb-12 text-[15px] leading-relaxed text-white/70">{meta}</p>
+      <p className="mb-12 text-[16px] leading-[1.5] text-white/70">{meta}</p>
 
       <div className="space-y-11">{children}</div>
 
       {footnote && (
-        <div className="mt-16 border-t border-white/10 pt-6 text-[15px] leading-relaxed text-white/70">
+        <div className="mt-16 border-t border-white/10 pt-6 text-[16px] leading-[1.5] text-white/70">
           {footnote}
         </div>
       )}

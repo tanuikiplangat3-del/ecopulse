@@ -41,7 +41,10 @@ const config: Config = {
         card: "0 4px 4px rgba(0,0,0,0.25)",
       },
       maxWidth: {
-        container: "1200px",
+        // Measured in Figma (WT-Website Client-facing, node 1544:3599): on the
+        // 1440 artboard every section runs x=100 to x=1340, so the content
+        // column is 1240 with 100px gutters.
+        container: "1240px",
         measure: "680px",
       },
     },

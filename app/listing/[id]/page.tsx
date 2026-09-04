@@ -130,7 +130,7 @@ export default async function ListingPage({
               <label className="field">
                 <span>Guest post document (Word / PDF)</span>
                 <input
-                  className="input file:mr-3 file:rounded-pill file:border-0 file:bg-wt-green file:px-4 file:py-1.5 file:text-white"
+                  className="input file:mr-3 file:rounded-sm file:border-0 file:bg-wt-green file:px-4 file:py-1.5 file:text-white"
                   type="file"
                   name="articleDoc"
                   accept=".doc,.docx,.pdf,.txt,.rtf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -139,7 +139,7 @@ export default async function ListingPage({
               <label className="field">
                 <span>Featured image (optional)</span>
                 <input
-                  className="input file:mr-3 file:rounded-pill file:border-0 file:bg-wt-green file:px-4 file:py-1.5 file:text-white"
+                  className="input file:mr-3 file:rounded-sm file:border-0 file:bg-wt-green file:px-4 file:py-1.5 file:text-white"
                   type="file"
                   name="featuredImageFile"
                   accept="image/*"

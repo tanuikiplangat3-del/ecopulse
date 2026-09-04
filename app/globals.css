@@ -14,6 +14,12 @@ body {
   color: #ffffff;
   -webkit-font-smoothing: antialiased;
   font-family: var(--font-outfit);
+  /* Every text layer in the Figma carries tracking of 1% of its own size
+     (16px -> 0.16px, 20px -> 0.2px), which is exactly 0.01em. Setting it once
+     here reproduces the whole file's letter-spacing without per-element values. */
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
 }
 
 /* Dark form controls to sit on the black canvas */
@@ -41,9 +47,13 @@ select option {
     @apply mx-auto w-full max-w-container px-5;
   }
 
-  /* Buttons - pill shaped */
+  /* Buttons. Measured from the "LET'S TALK" CTA in the Figma header
+     (node 1544:5171/5173): a 10px-radius rectangle 177x50 with a 2px white
+     border, label Outfit Bold 16px uppercase, tracking 0.8px (0.05em).
+     These were 30px pills at 15px before, which is why they never quite
+     matched the main site. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-pill px-7 py-3 text-[15px] font-bold uppercase tracking-[0.75px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+    @apply inline-flex h-[50px] items-center justify-center gap-2 rounded-sm px-8 text-[16px] font-bold uppercase tracking-[0.05em] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
   }
   .btn-primary {
     @apply btn bg-wt-green text-white hover:bg-wt-greenSoft;
@@ -52,18 +62,41 @@ select option {
     @apply btn bg-wt-yellow text-black hover:brightness-95;
   }
   .btn-ghost {
-    @apply btn border border-white/70 bg-transparent text-white hover:bg-white/10;
-  }
-  .btn-sm {
-    @apply px-4 py-2 text-xs;
+    @apply btn border-2 border-white bg-transparent text-white hover:bg-white/10;
   }
   .btn-danger {
     @apply btn bg-transparent border border-red-400/60 text-red-300 hover:bg-red-500/10;
   }
+  /* Compact variant for table rows and admin actions, where a 50px-tall
+     button would break the row rhythm. Same shape, smaller.
+     MUST stay last in this block: every colour variant @applies .btn, which
+     re-inlines the 50px height, and these rules all have equal specificity -
+     so whichever is written last wins. Defined earlier, `btn-danger btn-sm`
+     would silently come out full height. */
+  .btn-sm {
+    @apply h-auto px-4 py-2 text-[13px];
+  }
 
-  /* Cards - glass on black */
+  /* Cards. Confirmed against the Figma (node 1544:4220): a 20px-radius
+     rectangle filled white at 10% opacity. The tool already matched this, so
+     the card system is unchanged - rounded-lg is 20px and wt-surface1 is
+     rgba(255,255,255,0.10). The 0 4px 4px rgba(0,0,0,0.25) shadow is likewise
+     the Figma value (node 1544:4129). */
   .card {
     @apply rounded-lg border border-wt-border bg-wt-surface1 p-6 shadow-card backdrop-blur;
+  }
+
+  /* Feature panel: the black-to-blue gradient the design uses for its numbers
+     blocks (node 1544:4129, linear 90deg #000000 -> #2B4DFF at 142%). */
+  .panel-blue {
+    @apply rounded-lg p-6 shadow-card;
+    background: linear-gradient(90deg, #000000 0%, #2b4dff 142.37%);
+  }
+
+  /* Full-bleed white hairline the design uses between major sections
+     (nodes 1544:4437 / 4438 / 4439). */
+  .rule-wt {
+    @apply border-0 border-t border-white/100;
   }
 
   /* Inputs */
@@ -73,10 +106,12 @@ select option {
   .field > span {
     @apply mb-1.5 block text-sm font-semibold text-white/80;
   }
+  /* 10px radius to match the button family in the Figma; 16px text so form
+     fields sit on the same body scale as everything else. */
   .input,
   .select,
   .textarea {
-    @apply w-full rounded-md border border-wt-border bg-white/5 px-4 py-3 text-white placeholder-white/40 outline-none focus:border-wt-green;
+    @apply w-full rounded-sm border border-wt-border bg-white/5 px-4 py-3 text-[16px] text-white placeholder-white/40 outline-none focus:border-wt-green;
   }
   .textarea {
     @apply min-h-[120px];
@@ -111,9 +146,18 @@ select option {
   .flash-success { @apply border-wt-green/40 bg-wt-green/10 text-wt-green; }
   .flash-info { @apply border-white/20 bg-white/5 text-white/80; }
 
-  .h1 { @apply text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl; }
-  .h2 { @apply text-4xl font-bold leading-[1.08] tracking-tight md:text-5xl; }
-  .h3 { @apply text-2xl font-bold leading-snug; }
+  /* Type scale measured from the Figma, not estimated:
+       h1   60px Outfit Bold, line-height 1.1   (node 1544:3719)
+       h2   45px Outfit Bold, line-height 1.1   (node 1544:4143)
+       lead 20px Outfit Regular, line-height 1.5 (node 1544:3720)
+       body 16px Outfit Regular, line-height 1.5 (node 1544:4136)
+     The desktop values are the Figma ones; the smaller value is the phone
+     step down, since the artboard is desktop-only. Note there is no negative
+     tracking anywhere in the file - the old `tracking-tight` was invented. */
+  .h1 { @apply text-[38px] font-bold leading-[1.1] md:text-[60px]; }
+  .h2 { @apply text-[30px] font-bold leading-[1.1] md:text-[45px]; }
+  .h3 { @apply text-[24px] font-bold leading-[1.3]; }
+  .lead { @apply text-[18px] leading-[1.5] text-white md:text-[20px]; }
   .muted { @apply text-white/60; }
 
   /* Marketing gradient bands - taken verbatim from the welcometomorrow.io theme

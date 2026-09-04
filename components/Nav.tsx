@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { money } from "@/lib/money";
-import LogoReveal from "@/components/LogoReveal";
+
+const LOGO = "https://welcometomorrow.io/wp-content/uploads/2025/07/WT-logo-white.svg";
 
 export default async function Nav() {
   const u = await getCurrentUser();
@@ -9,15 +10,18 @@ export default async function Nav() {
   // on the surface that belongs to their role when they click the logo.
   const homeHref = !u ? "/" : u.role === "buyer" ? "/marketplace" : "/dashboard";
   return (
-    <header className="sticky top-0 z-50 border-b border-white/5 bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px]">
-      <div className="container-wt flex h-20 items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px]">
+      {/* Header geometry taken from the Figma menu component (node 1544:5188):
+          an 84px row, logo occupying its full height, nav labels Outfit Bold
+          16px. Stepped down on phones so the sticky bar does not eat the
+          viewport - the artboard is desktop-only. */}
+      <div className="container-wt flex h-[64px] items-center justify-between gap-4 md:h-[84px]">
         <Link href={homeHref} className="flex items-center" aria-label="Welcome Tomorrow">
-          {/* The one logo on the site. It reveals itself once per visitor and is
-              simply there on every visit after that. */}
-          <LogoReveal />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO} alt="Welcome Tomorrow" className="h-[48px] w-auto md:h-[84px]" />
         </Link>
 
-        <nav className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm font-semibold">
+        <nav className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[16px] font-bold">
           {(!u || u.role !== "publisher") && (
             <Link href="/marketplace" className="text-white/85 hover:text-white">
               Marketplace
@@ -69,7 +73,10 @@ export default async function Nav() {
               <Link href="/login" className="text-white/85 hover:text-white">
                 Sign in
               </Link>
-              <Link href="/register" className="btn-primary btn-sm">
+              {/* The Figma header CTA ("LET'S TALK", node 1544:5171) is a
+                  177x50 outline button with a 2px white border, not a filled
+                  pill - so the signed-out CTA now matches it. */}
+              <Link href="/register" className="btn-ghost">
                 Get started
               </Link>
             </>

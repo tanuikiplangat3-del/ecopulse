@@ -36,7 +36,7 @@ export default function ChatWidget() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Chat with us"
-        className="fixed bottom-6 right-6 z-[80] flex items-center gap-2 rounded-pill bg-wt-green px-5 py-3 text-[15px] font-bold uppercase tracking-[0.5px] text-white shadow-card transition-transform hover:scale-105"
+        className="fixed bottom-6 right-6 z-[80] flex items-center gap-2 rounded-sm bg-wt-green px-5 py-3 text-[15px] font-bold uppercase tracking-[0.05em] text-white shadow-card transition-transform hover:scale-105"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden>
           <path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8l-4 4V5a1 1 0 0 1 1-1Zm3 5h10V7H7v2Zm0 4h7v-2H7v2Z" />

@@ -184,7 +184,7 @@ export default async function MarketplacePage({
           </p>
           <Link
             href="/register"
-            className="mt-6 inline-block rounded-pill bg-black px-8 py-3 text-[15px] font-bold uppercase tracking-[0.75px] text-white hover:bg-black/80"
+            className="mt-6 inline-block rounded-sm bg-black px-8 py-3 text-[16px] font-bold uppercase tracking-[0.05em] text-white hover:bg-black/80"
           >
             Sign up to acquire from publishers
           </Link>
