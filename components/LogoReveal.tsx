@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 
 /**
- * The Welcome Tomorrow lockup, revealed once.
+ * The Welcome Tomorrow logo in the header, revealed once.
+ *
+ * This is THE logo on the site - there is not a second one anywhere. It sits in
+ * the header exactly where the static image used to, at the same size.
  *
  * Deliberate choices, so this is not re-litigated later:
  *
@@ -64,14 +67,11 @@ export default function LogoReveal({ className = "" }: { className?: string }) {
           display: inline-block;
           line-height: 0;
         }
+        /* Matches the header logo it replaces (h-8 = 2rem). */
         .wt-reveal-mark {
-          height: 3.25rem;
+          height: 2rem;
           width: auto;
-        }
-        @media (min-width: 768px) {
-          .wt-reveal-mark {
-            height: 4.5rem;
-          }
+          display: block;
         }
 
         /* Nothing below runs unless the reveal is actually due. */

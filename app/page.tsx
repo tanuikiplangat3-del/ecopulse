@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import ListingCard from "@/components/ListingCard";
-import LogoReveal from "@/components/LogoReveal";
 import { centsFromUsd, publisherPriceFromBuyer } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -79,9 +78,6 @@ export default async function HomePage() {
     <div>
       {/* Hero */}
       <section className="mx-auto max-w-4xl py-12 text-center md:py-20">
-        {/* Plays once per visitor, then simply renders. See LogoReveal. */}
-        <LogoReveal className="mb-8" />
-        <span className="badge badge-green mb-6 block">Link Building Marketplace</span>
         <h1 className="h1">
           Build your backlink profile with <span className="text-wt-green">Welcome Tomorrow</span>
         </h1>

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { money } from "@/lib/money";
-
-const LOGO = "https://welcometomorrow.io/wp-content/uploads/2025/07/WT-logo-white.svg";
+import LogoReveal from "@/components/LogoReveal";
 
 export default async function Nav() {
   const u = await getCurrentUser();
@@ -13,8 +12,9 @@ export default async function Nav() {
     <header className="sticky top-0 z-50 border-b border-white/5 bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px]">
       <div className="container-wt flex h-20 items-center justify-between gap-4">
         <Link href={homeHref} className="flex items-center" aria-label="Welcome Tomorrow">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO} alt="Welcome Tomorrow" className="h-8 w-auto" />
+          {/* The one logo on the site. It reveals itself once per visitor and is
+              simply there on every visit after that. */}
+          <LogoReveal />
         </Link>
 
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm font-semibold">
