@@ -7,6 +7,7 @@ import { REFRESH_AFTER_DAYS } from "@/lib/metrics";
 import { normalizeCountry } from "@/lib/data";
 import { countConflicts } from "@/lib/duplicates";
 import Link from "next/link";
+import { authorityFor, isClaimedAuthority } from "@/lib/authority";
 
 export default async function AdminListings({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   await requireRole("admin");
@@ -89,7 +90,17 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
                   </div>
                 </td>
                 <td className="muted">{l.publisher.name}</td>
-                <td>{l.domainRating}</td>
+                {/* A DA is a publisher's claim, so show the real Ahrefs DR
+                    beside it - a site claiming DA 70 that Ahrefs rates DR 2 is
+                    then obvious at the moment of approving. */}
+                <td>
+                  <span className="font-semibold">
+                    {authorityFor(l).label} {authorityFor(l).value}
+                  </span>
+                  {isClaimedAuthority(l) && (
+                    <div className="muted text-xs">Ahrefs DR {l.domainRating}</div>
+                  )}
+                </td>
                 <td>{trafficShort(l.monthlyTraffic)}</td>
                 <td>{money(l.priceCents)}</td>
                 <td><StatusBadge status={l.status} /></td>

@@ -18,7 +18,9 @@ export default async function Nav() {
       <div className="container-wt flex h-[64px] items-center justify-between gap-4 md:h-[84px]">
         <Link href={homeHref} className="flex items-center" aria-label="Welcome Tomorrow">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO} alt="Welcome Tomorrow" className="h-[48px] w-auto md:h-[84px]" />
+          {/* Midway between the 84px taken straight from the Figma, which was
+              too heavy in a working tool, and the 40px it was before. */}
+          <img src={LOGO} alt="Welcome Tomorrow" className="h-[44px] w-auto md:h-[62px]" />
         </Link>
 
         <nav className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[16px] font-bold">

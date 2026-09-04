@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { money, trafficShort } from "@/lib/money";
 import { StatusBadge, Flash } from "@/components/ui";
 import { deleteUserAction, deletePublisherListingsAction } from "@/app/actions/admin";
+import { authorityFor, isClaimedAuthority } from "@/lib/authority";
 
 export const metadata = { title: "Publisher" };
 
@@ -72,7 +73,12 @@ export default async function AdminPublisherPage({
               <tr key={l.id}>
                 <td className="font-semibold">{l.domain}</td>
                 <td className="muted">{l.country}</td>
-                <td>{l.domainRating}</td>
+                <td>
+                  {authorityFor(l).label} {authorityFor(l).value}
+                  {isClaimedAuthority(l) && (
+                    <div className="muted text-xs">Ahrefs DR {l.domainRating}</div>
+                  )}
+                </td>
                 <td>{trafficShort(l.monthlyTraffic)}</td>
                 <td>{money(l.priceCents)}</td>
                 <td><StatusBadge status={l.status} /></td>

@@ -30,17 +30,24 @@ export default async function BulkUploadPage({
         <div className="overflow-x-auto">
           <table className="table-wt">
             <thead>
-              <tr><th>site name</th><th>url</th><th>price</th><th>country</th><th>language</th><th>niche</th></tr>
+              <tr><th>site name</th><th>url</th><th>price</th><th>country</th><th>language</th><th>niche</th><th>da</th></tr>
             </thead>
             <tbody>
               <tr>
-                <td>Kone Media</td><td>konemedia.co.ke</td><td>150</td><td>Kenya</td><td>English</td><td>Business, Finance</td>
+                <td>Kone Media</td><td>konemedia.co.ke</td><td>150</td><td>Kenya</td><td>English</td><td>Business, Finance</td><td>45</td>
               </tr>
             </tbody>
           </table>
         </div>
         <p className="muted mt-3 text-xs">
           For multiple niches on one site, separate them with commas, or write General.
+        </p>
+        <p className="muted mt-2 text-xs">
+          <strong className="text-white">The da column is optional.</strong> Leave it blank and
+          we fill in the site&rsquo;s Domain Rating from Ahrefs automatically. Put a number
+          from 1 to 100 in it and that site shows your Domain Authority instead of DR &mdash;
+          use it for sites that score better on DA. Anything we cannot read as a number is
+          ignored and the site stays on DR.
         </p>
       </div>
 

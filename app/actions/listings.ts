@@ -9,6 +9,13 @@ import { centsFromUsd, money, MARKUP_TIERED } from "@/lib/money";
 import { checkDuplicate, liveDomains, STATUS_CONFLICT } from "@/lib/duplicates";
 import { normalizeCountry } from "@/lib/data";
 import { fetchDomainMetrics } from "@/lib/ahrefs";
+import {
+  AUTHORITY_DA,
+  authorityScoreFor,
+  authorityType as authorityTypeOf,
+  parseDaCell,
+  parseDaInput,
+} from "@/lib/authority";
 
 const q = (s: string) => encodeURIComponent(s);
 const autoApprove = () => (process.env.AUTO_APPROVE_LISTINGS || "true") === "true";
@@ -16,13 +23,23 @@ const autoApprove = () => (process.env.AUTO_APPROVE_LISTINGS || "true") === "tru
 async function makeListing(publisherId: number, data: {
   domain: string; url?: string; category: string; country: string;
   language?: string; priceCents: number; linkType?: string; tatDays?: number; description?: string;
+  // Which authority number this site displays. Omitted means DR, which is what
+  // every site created before this feature used.
+  authorityType?: string; domainAuthority?: number;
 }, opts: { skipAhrefs?: boolean; status?: string } = {}) {
   const domain = data.domain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   const url = (data.url || `https://${domain}`).trim();
-  // Auto-fetch DR + monthly traffic from Ahrefs (fails soft to 0).
+  // Auto-fetch DR + monthly traffic from Ahrefs (fails soft to 0). This runs
+  // even when the site will display DA: traffic is needed either way, DR comes
+  // back in the same call, and admins compare the two when approving.
   const metrics = opts.skipAhrefs ? { dr: 0, traffic: 0, ok: false } : await fetchDomainMetrics(domain);
   const dr = metrics.dr;
   const traffic = metrics.traffic;
+  const authority = {
+    authorityType: authorityTypeOf(data.authorityType),
+    domainRating: dr,
+    domainAuthority: data.domainAuthority || 0,
+  };
   return prisma.listing.create({
     data: {
       publisherId,
@@ -33,6 +50,9 @@ async function makeListing(publisherId: number, data: {
       language: data.language || "English",
       domainRating: dr,
       monthlyTraffic: traffic,
+      authorityType: authority.authorityType,
+      domainAuthority: authority.domainAuthority,
+      authorityScore: authorityScoreFor(authority),
       markupModel: MARKUP_TIERED, // new sites use tiered pricing; older ones keep +$30
       // Only mark as fetched when Ahrefs actually answered, so the weekly
       // refresh picks it up straight away if it did not.
@@ -57,10 +77,20 @@ export async function createListingAction(formData: FormData) {
   const tatDays = parseInt(String(formData.get("tatDays") || "7")) || 7;
   const description = String(formData.get("description") || "").trim();
   const first = String(formData.get("first") || "") === "1";
+  // DR or DA. On DR we type nothing - Ahrefs fills it in below. On DA the
+  // publisher supplies the number themselves, because we are not connected to
+  // Moz and cannot look it up.
+  const chosenAuthority = authorityTypeOf(String(formData.get("authorityType") || ""));
+  const daValue = parseDaInput(formData.get("domainAuthority"));
 
   if (!domain) redirect(`/new-listing?error=${q("Please enter your website domain.")}${first ? "&first=1" : ""}`);
   if (!country) redirect(`/new-listing?error=${q("Please choose a country.")}${first ? "&first=1" : ""}`);
   if (!priceUsd || priceUsd <= 0) redirect(`/new-listing?error=${q("Enter a valid price in USD.")}${first ? "&first=1" : ""}`);
+  // Choosing DA and then leaving the box blank would silently publish the site
+  // on its Ahrefs DR - the opposite of what the publisher asked for. Stop.
+  if (chosenAuthority === AUTHORITY_DA && daValue === null) {
+    redirect(`/new-listing?error=${q("Enter your Domain Authority as a number between 1 and 100, or choose Domain Rating instead.")}${first ? "&first=1" : ""}`);
+  }
 
   const cleanDomain = domain.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/.*$/, "");
   const dupe = await checkDuplicate(cleanDomain);
@@ -76,6 +106,8 @@ export async function createListingAction(formData: FormData) {
     linkType,
     tatDays,
     description,
+    authorityType: chosenAuthority,
+    domainAuthority: daValue || 0,
   }, {
     // Already on the marketplace? Hold it for review rather than publishing it
     // or quietly taking anyone down. An admin compares the two prices and
@@ -124,6 +156,8 @@ export async function bulkUploadAction(formData: FormData) {
   const toProcess = rows.slice(0, MAX_ROWS);
   const data: any[] = [];
   let skipped = 0;
+  // How many rows carried a usable DA, so the confirmation can say so.
+  let daRows = 0;
   // Country cells that we could not match to a real country, and how many rows
   // used each one. Reported back so the sheet can be corrected, rather than
   // quietly filing those sites under a country nobody will find them in.
@@ -144,6 +178,11 @@ export async function bulkUploadAction(formData: FormData) {
     const country = matched || rawCountry || "Kenya";
     const language = get(row, ["language", "lang"]) || "English";
     const niche = get(row, ["niche", "niches", "category", "categories"]) || "General";
+    // Optional DA column. A usable number here means this site displays DA
+    // instead of the Ahrefs DR; blank, "n/a" or anything out of the 1-100 range
+    // leaves the site on DR. Junk must never become a real-looking score, so
+    // parseDaCell decides, not this loop.
+    const da = parseDaCell(get(row, ["da", "domain authority", "domainauthority", "moz da", "moz"]));
     const price = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
     if (!raw || !price || price <= 0) {
       skipped++;
@@ -154,6 +193,9 @@ export async function bulkUploadAction(formData: FormData) {
       skipped++;
       continue;
     }
+    // Counted here, after the skip checks, so the confirmation never credits a
+    // DA on a row that was thrown away for a missing website or price.
+    if (da !== null) daRows++;
     data.push({
       publisherId: user.id,
       domain,
@@ -163,6 +205,13 @@ export async function bulkUploadAction(formData: FormData) {
       language,
       domainRating: 0,
       monthlyTraffic: 0,
+      // No Ahrefs call happens during a bulk upload, so DR is still 0 here and
+      // gets filled in later by "Refresh DR & traffic". A DA row can therefore
+      // show its real number immediately, while a DR row shows 0 until the
+      // refresh runs - which is how bulk upload already behaved.
+      authorityType: da !== null ? AUTHORITY_DA : undefined,
+      domainAuthority: da || 0,
+      authorityScore: da || 0,
       markupModel: MARKUP_TIERED,
       linkType: "guest_post",
       priceCents: centsFromUsd(price),
@@ -220,7 +269,12 @@ export async function bulkUploadAction(formData: FormData) {
     countryNote +
     (missingCountry ? ` ${missingCountry} row(s) had no country column filled in and were set to Kenya.` : "") +
     (rows.length > MAX_ROWS ? ` Only the first ${MAX_ROWS} rows were read.` : "") +
-    " Domain Rating and traffic are added shortly.";
+    (daRows
+      ? ` ${daRows} site(s) had a Domain Authority in the DA column and will display DA instead of DR.`
+      : "") +
+    (created - daRows > 0
+      ? ` Domain Rating and traffic for the other site(s) are added shortly.`
+      : " Traffic figures are added shortly.");
   redirect(first ? `/payout?first=1` : `/my-listings?success=${q(note)}`);
 }
 
@@ -250,4 +304,67 @@ export async function savePayoutAction(formData: FormData) {
     },
   });
   redirect(first ? `/dashboard?success=${q("You're all set. Welcome aboard!")}` : `/payout?success=${q("Payment details saved.")}`);
+}
+
+/**
+ * Let a publisher change which authority number their site displays, or correct
+ * the DA they entered.
+ *
+ * This is deliberately the ONLY thing a publisher can edit on a live listing.
+ * DA is a claim we cannot verify against Moz, so a change here does not go
+ * straight to buyers - the site returns to "pending" and an admin sees the new
+ * number, and the real Ahrefs DR beside it, before it goes back on sale. A site
+ * currently held on a pricing conflict keeps that status: sending it to
+ * "pending" would let it slip past the conflicts queue and publish alongside
+ * the rival listing it is waiting on.
+ */
+export async function changeAuthorityAction(formData: FormData) {
+  const user = await requireRole("publisher");
+  const id = parseInt(String(formData.get("id") || "0")) || 0;
+  const chosen = authorityTypeOf(String(formData.get("authorityType") || ""));
+  const daValue = parseDaInput(formData.get("domainAuthority"));
+
+  // Scope the lookup to this publisher so an id from another account cannot be
+  // edited by posting the form by hand.
+  const listing = await prisma.listing.findFirst({ where: { id, publisherId: user.id } });
+  if (!listing) redirect(`/my-listings?error=${q("That website was not found.")}`);
+
+  if (chosen === AUTHORITY_DA && daValue === null) {
+    redirect(`/my-listings?error=${q("Enter a Domain Authority between 1 and 100, or choose Domain Rating.")}`);
+  }
+
+  const next = {
+    authorityType: chosen,
+    domainRating: listing!.domainRating,
+    domainAuthority: chosen === AUTHORITY_DA ? daValue! : 0,
+  };
+
+  // Nothing actually changed - do not send a live site back to review for it.
+  if (
+    next.authorityType === listing!.authorityType &&
+    next.domainAuthority === listing!.domainAuthority
+  ) {
+    redirect(`/my-listings?success=${q("No change - that is already what this website shows.")}`);
+  }
+
+  await prisma.listing.update({
+    where: { id: listing!.id },
+    data: {
+      authorityType: next.authorityType,
+      domainAuthority: next.domainAuthority,
+      authorityScore: authorityScoreFor(next),
+      // A conflict is waiting on an admin price decision; leave it there.
+      status: listing!.status === STATUS_CONFLICT ? listing!.status : "pending",
+    },
+  });
+
+  revalidatePath("/my-listings");
+  revalidatePath("/marketplace");
+  redirect(
+    `/my-listings?success=${q(
+      chosen === AUTHORITY_DA
+        ? `Updated. ${listing!.domain} will show DA ${next.domainAuthority} once our team has checked it.`
+        : `Updated. ${listing!.domain} will show its Ahrefs Domain Rating once our team has checked it.`
+    )}`
+  );
 }

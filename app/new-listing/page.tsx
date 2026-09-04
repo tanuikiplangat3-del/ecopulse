@@ -4,6 +4,7 @@ import { createListingAction } from "@/app/actions/listings";
 import { Flash } from "@/components/ui";
 import SearchSelect from "@/components/SearchSelect";
 import { one } from "@/lib/util";
+import AuthorityField from "@/components/AuthorityField";
 
 export const metadata = { title: "Add a website" };
 
@@ -65,6 +66,8 @@ export default async function NewListingPage({
             ))}
           </div>
         </div>
+
+        <AuthorityField />
 
         <label className="field mt-4">
           <span>Description</span>

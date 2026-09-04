@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth";
 import { money, buyerPrice, trafficShort, MARKUP_REQUESTED } from "@/lib/money";
 import { Flash } from "@/components/ui";
 import { pendingConflicts, LIVE_STATUS } from "@/lib/duplicates";
+import { authorityFor, isClaimedAuthority } from "@/lib/authority";
 import {
   keepCurrentListingAction,
   switchToNewListingAction,
@@ -183,7 +184,10 @@ function Side({
         <Row label="Publisher" value={listing.publisher?.name || "—"} />
         <Row label="Publisher price" value={money(listing.priceCents)} strong />
         <Row label="Buyer pays" value={buyerPays !== null ? money(buyerPays) : "—"} />
-        <Row label="DR" value={String(listing.domainRating)} />
+        <Row label={authorityFor(listing).label} value={String(authorityFor(listing).value)} />
+        {isClaimedAuthority(listing) && (
+          <Row label="Ahrefs DR" value={String(listing.domainRating)} />
+        )}
         <Row label="Traffic" value={trafficShort(listing.monthlyTraffic)} />
         <Row label="Turnaround" value={`${listing.tatDays} days`} />
         <Row label="Listed" value={listing.createdAt.toISOString().slice(0, 10)} />

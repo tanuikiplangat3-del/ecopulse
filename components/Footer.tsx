@@ -79,15 +79,19 @@ export default function Footer() {
   return (
     <footer className="mt-24 border-t border-white/10">
       <div className="container-wt py-16">
-        <div className="grid gap-12 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        {/* The logo sits alone on its own row. The three link columns then line
+            up with the "Moving away..." paragraph rather than with the logo -
+            which is how the main site footer is laid out. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={LOGO} alt="Welcome Tomorrow" className="h-12 w-auto" />
+
+        <div className="mt-14 grid gap-12 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={LOGO} alt="Welcome Tomorrow" className="h-12 w-auto" />
-            <p className="mt-8 max-w-sm text-[14px] leading-[1.5] text-white">
+            <p className="max-w-sm text-[16px] font-bold leading-[1.5] text-white">
               Moving away from traditional marketing agencies, Welcome Tomorrow sets new
               standards as your trusted growth partner.
             </p>
-            <p className="mt-5 max-w-sm text-[14px] leading-[1.5] text-white">
+            <p className="mt-6 max-w-sm text-[16px] font-bold leading-[1.5] text-white">
               We operate across the continent, with our main offices located in
               Cape Town, Nairobi, and Lagos
             </p>
@@ -110,8 +114,8 @@ export default function Footer() {
           <FooterCol title="Company" items={COMPANY} />
           <FooterCol title="Services" items={SERVICES} />
           <div>
-            <h4 className="mb-6 text-[18px] font-semibold text-white">Expertise</h4>
-            <ul className="space-y-4 text-[14px] text-white">
+            <h4 className="mb-6 text-[20px] font-bold text-white">Expertise</h4>
+            <ul className="space-y-4 text-[16px] font-bold text-white">
               {EXPERTISE.map((e) => (
                 <li key={e}>
                   <a href={`${SITE}/`} className="transition-colors hover:text-wt-green">{e}</a>
@@ -137,8 +141,8 @@ export default function Footer() {
 function FooterCol({ title, items }: { title: string; items: { label: string; href: string }[] }) {
   return (
     <div>
-      <h4 className="mb-6 text-[18px] font-semibold text-white">{title}</h4>
-      <ul className="space-y-4 text-[14px] text-white">
+      <h4 className="mb-6 text-[20px] font-bold text-white">{title}</h4>
+      <ul className="space-y-4 text-[16px] font-bold text-white">
         {items.map((i) => (
           <li key={i.label}>
             <a href={i.href} className="transition-colors hover:text-wt-green">{i.label}</a>

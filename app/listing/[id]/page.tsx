@@ -8,6 +8,7 @@ import { linkTypeLabel } from "@/lib/data";
 import { requesterOrdersLeft } from "@/lib/requester";
 import { placeOrderAction } from "@/app/actions/orders";
 import { Flash } from "@/components/ui";
+import { authorityFor } from "@/lib/authority";
 
 export default async function ListingPage({
   params,
@@ -61,7 +62,12 @@ export default async function ListingPage({
         <p className="muted mb-5">{listing.country} · {listing.language}</p>
 
         <div className="card mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div><p className="muted text-xs">Domain Rating</p><p className="text-xl font-bold">{listing.domainRating}</p></div>
+          <div>
+            <p className="muted text-xs">
+              {authorityFor(listing).label === "DA" ? "Domain Authority" : "Domain Rating"}
+            </p>
+            <p className="text-xl font-bold">{authorityFor(listing).value}</p>
+          </div>
           <div><p className="muted text-xs">Monthly Traffic</p><p className="text-xl font-bold">{trafficShort(listing.monthlyTraffic)}</p></div>
           <div><p className="muted text-xs">Turnaround</p><p className="text-xl font-bold">{listing.tatDays}d</p></div>
           <div><p className="muted text-xs">Type</p><p className="text-lg font-bold">{linkTypeLabel(listing.linkType)}</p></div>

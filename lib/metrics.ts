@@ -4,6 +4,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { fetchDomainMetrics } from "@/lib/ahrefs";
+import { authorityScoreFor } from "@/lib/authority";
 
 /** How old a listing's metrics may get before they are refreshed again. */
 export const REFRESH_AFTER_DAYS = 7;
@@ -75,9 +76,19 @@ export async function refreshDueMetrics(opts: {
         });
         continue;
       }
+      // Refresh the real Ahrefs DR for every site, including ones that display
+      // a publisher-supplied DA - admins need the true number to sanity-check
+      // the claim, and traffic comes back in the same call anyway.
+      // authorityScore then follows whichever number is on display: it moves
+      // with DR on a DR site and stays put on a DA site.
       await prisma.listing.update({
         where: { id: chunk[j].id },
-        data: { domainRating: dr, monthlyTraffic: traffic, metricsUpdatedAt: new Date() },
+        data: {
+          domainRating: dr,
+          monthlyTraffic: traffic,
+          metricsUpdatedAt: new Date(),
+          authorityScore: authorityScoreFor({ ...chunk[j], domainRating: dr }),
+        },
       });
       updated++;
     }

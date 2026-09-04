@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { money, buyerPrice, trafficShort } from "@/lib/money";
 import { linkTypeLabel } from "@/lib/data";
+import { authorityFor } from "@/lib/authority";
 
 type L = {
   id: number;
@@ -9,6 +10,10 @@ type L = {
   country: string;
   category: string;
   domainRating: number;
+  // Optional so existing callers that select a narrower row still typecheck;
+  // authorityFor() treats a missing type as DR, which is the old behaviour.
+  authorityType?: string | null;
+  domainAuthority?: number | null;
   monthlyTraffic: number;
   linkType: string;
   priceCents: number;
@@ -108,8 +113,9 @@ export default function ListingCard({
 
       <div className="mt-4 flex gap-4 text-sm">
         <div>
-          <p className="muted text-xs">DR</p>
-          <p className="font-semibold">{listing.domainRating}</p>
+          {/* DR or DA, whichever this publisher chose to display. */}
+          <p className="muted text-xs">{authorityFor(listing).label}</p>
+          <p className="font-semibold">{authorityFor(listing).value}</p>
         </div>
         <div>
           <p className="muted text-xs">Traffic</p>

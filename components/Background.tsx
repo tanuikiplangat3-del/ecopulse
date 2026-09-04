@@ -20,11 +20,22 @@
 // resolution.
 //
 // Tuning notes, so this is not guesswork if it ever needs adjusting:
-//   baseFrequency  lower = broader, lazier waves. 0.0011 matches the brand film.
+//   baseFrequency  THE smoothness dial, and the one that matters most. Noise
+//                  varies over a distance of roughly 1/baseFrequency pixels, so
+//                  a high value makes the noise turn over several times along a
+//                  single grid line and the line comes out visibly kinked. At
+//                  0.00035 the noise turns over about every 2800px - far wider
+//                  than the screen - so each line reads as one clean curve.
+//                  0.0011 was the earlier value and was the cause of the wobble.
 //   numOctaves     1 keeps the curves smooth; 2+ adds high-frequency wobble that
 //                  visibly breaks thin strokes into dashes.
-//   scale          how far the grid is pushed. ~190 gives the brand's swirl.
-//   pattern width  52px squares at 1x.
+//   scale          how far the grid is pushed. 170 keeps a clear single wave now
+//                  that the noise underneath it is smooth.
+//   pattern width  44px squares at 1x, stroke 1px - a tighter, finer weave than
+//                  the 52px/1.6px it replaces.
+//
+// These four were chosen by rendering the candidates side by side in a real
+// browser against the brand reference, not by eye-balling numbers.
 
 /** Height of the hero band, from the Figma: 741px tall starting at y=-26. */
 const BAND_H = 715;
@@ -57,8 +68,8 @@ export function Background() {
       >
         <svg className="h-full w-full" preserveAspectRatio="xMidYMid slice">
           <defs>
-            <pattern id="wt-mesh" width="52" height="52" patternUnits="userSpaceOnUse">
-              <path d="M52 0H0V52" fill="none" stroke="#000000" strokeWidth="1.6" />
+            <pattern id="wt-mesh" width="44" height="44" patternUnits="userSpaceOnUse">
+              <path d="M44 0H0V44" fill="none" stroke="#000000" strokeWidth="1" />
             </pattern>
             <filter
               id="wt-warp"
@@ -70,7 +81,7 @@ export function Background() {
             >
               <feTurbulence
                 type="fractalNoise"
-                baseFrequency="0.0011"
+                baseFrequency="0.00035"
                 numOctaves={1}
                 seed={12}
                 result="noise"
@@ -78,7 +89,7 @@ export function Background() {
               <feDisplacementMap
                 in="SourceGraphic"
                 in2="noise"
-                scale={190}
+                scale={170}
                 xChannelSelector="R"
                 yChannelSelector="G"
               />

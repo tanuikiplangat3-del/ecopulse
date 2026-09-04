@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import ListingCard from "@/components/ListingCard";
 import SearchSelect from "@/components/SearchSelect";
 import { Flash } from "@/components/ui";
-import { NICHES, COUNTRIES, LANGUAGES } from "@/lib/data";
+import { NICHES, COUNTRIES, LANGUAGES, nicheWhere } from "@/lib/data";
 import { centsFromUsd, filterFloorFromBuyer, filterCeilingFromBuyer } from "@/lib/money";
 import { getViewerAccess, maskListing, FREE_PREVIEW_COUNT } from "@/lib/access";
 import { requesterRateListingIds } from "@/lib/requester";
@@ -30,14 +30,22 @@ export default async function MarketplacePage({
   const country = one(searchParams.country);
   const niche = one(searchParams.niche);
   const language = one(searchParams.language);
+  // Minimum authority. One filter for both metrics: a site is matched on the
+  // number it actually displays, so DR 50 and DA 50 sites appear together.
+  // authorityScore holds that number and is indexed, which is why this is a
+  // plain gte rather than an OR across two columns.
+  const minAuthority = parseInt(one(searchParams.authority) || "");
   const min = parseFloat(one(searchParams.min));
   const max = parseFloat(one(searchParams.max));
 
   const where: any = { status: "approved" };
   if (qStr) where.domain = { contains: qStr };
   if (country) where.country = country;
-  if (niche) where.category = { contains: niche };
+  // Whole-entry match, not a substring - see nicheWhere() for why that matters.
+  // Wrapped in AND so this OR cannot collide with any other OR on the query.
+  if (niche) where.AND = [nicheWhere(niche)];
   if (language) where.language = language;
+  if (!isNaN(minAuthority) && minAuthority > 0) where.authorityScore = { gte: minAuthority };
   // Buyers filter on the price they see (publisher price + standard markup),
   // so translate the bounds back to the stored publisher price.
   if (!isNaN(min) || !isNaN(max)) {
@@ -87,7 +95,7 @@ export default async function MarketplacePage({
 
   // Preserve active filters when moving between pages.
   const filterParams = new URLSearchParams();
-  for (const k of ["q", "country", "language", "niche", "min", "max"]) {
+  for (const k of ["q", "country", "language", "niche", "min", "max", "authority"]) {
     const v = one(searchParams[k as keyof typeof searchParams] as any);
     if (v) filterParams.set(k, v);
   }
@@ -104,7 +112,7 @@ export default async function MarketplacePage({
       <Flash searchParams={searchParams} />
 
       {user && (
-        <form className="card mb-6 grid gap-4 md:grid-cols-6" method="get">
+        <form className="card mb-6 grid gap-4 md:grid-cols-7" method="get">
           <label className="field mb-0 md:col-span-2">
             <span>Search domain</span>
             <input className="input" name="q" defaultValue={qStr} placeholder="e.g. konemedia" />
@@ -121,6 +129,18 @@ export default async function MarketplacePage({
             <span>Niche</span>
             <SearchSelect name="niche" options={NICHES} defaultValue={niche} title="Filter by niche" />
           </div>
+          <label className="field mb-0">
+            <span>Min authority</span>
+            <select className="select" name="authority" defaultValue={one(searchParams.authority)}>
+              <option value="">Any</option>
+              <option value="20">20+</option>
+              <option value="30">30+</option>
+              <option value="40">40+</option>
+              <option value="50">50+</option>
+              <option value="60">60+</option>
+              <option value="70">70+</option>
+            </select>
+          </label>
           <div className="grid grid-cols-2 gap-2">
             <label className="field mb-0">
               <span>Min $</span>
@@ -131,7 +151,7 @@ export default async function MarketplacePage({
               <input className="input" name="max" type="number" min="0" defaultValue={one(searchParams.max)} />
             </label>
           </div>
-          <div className="md:col-span-6">
+          <div className="md:col-span-7">
             <button className="btn-primary btn-sm" type="submit">Apply filters</button>
           </div>
         </form>

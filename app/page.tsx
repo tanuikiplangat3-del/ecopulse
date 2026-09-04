@@ -67,10 +67,12 @@ export default async function HomePage() {
   const featured = await prisma.listing.findMany({
     where: {
       status: "approved",
-      domainRating: { gte: 50 },
+      // Featured on the number buyers actually see, so a strong DA site is not
+      // shut out by a weak Ahrefs DR.
+      authorityScore: { gte: 50 },
       priceCents: { lt: publisherPriceFromBuyer(centsFromUsd(300)) },
     },
-    orderBy: { domainRating: "desc" },
+    orderBy: { authorityScore: "desc" },
     take: 6,
   });
 
@@ -78,9 +80,15 @@ export default async function HomePage() {
     <div>
       {/* Hero */}
       <section className="mx-auto max-w-4xl py-12 text-center md:py-20">
-        <h1 className="h1">
-          Build your backlink profile with <span className="text-wt-green">Welcome Tomorrow</span>
+        {/* The eyebrow is the H1: it carries the words this page should rank
+            for. The big line below it is the visual headline, so it is marked
+            up as a paragraph - a page should have exactly one H1. */}
+        <h1 className="text-[14px] font-bold uppercase tracking-[0.12em] text-white/70 md:text-[16px]">
+          Best backlink marketplace for Africa Brands
         </h1>
+        <p className="h1 mt-5">
+          Build your backlink profile with Welcome Tomorrow
+        </p>
         <p className="muted mx-auto mt-6 max-w-measure text-lg">
           Acquire quality backlinks and guest posts from vetted African publishers. Orders
           are escrow protected, pricing is transparent, and every placement is verified.

@@ -284,3 +284,30 @@ export const LINK_TYPES = [
 export function linkTypeLabel(v: string): string {
   return LINK_TYPES.find((t) => t.value === v)?.label || v;
 }
+
+/**
+ * Prisma clause matching listings whose category list contains `niche` as a
+ * WHOLE entry.
+ *
+ * Categories are stored as one comma-separated string ("Business, Finance"),
+ * so the filter used to be a plain `contains`. That is wrong, and quietly so:
+ * "IT" is one of our niches, and a spreadsheet category written "DIGITAL
+ * MARKETING" contains the letters I-T inside "DIGITAL" - so filtering for IT
+ * returned it. Same for any niche that happens to sit inside a longer word.
+ *
+ * Matching whole entries removes that entire class of false hit. Sheets
+ * separate with "," or ", " depending on who typed them, so both are covered.
+ */
+export function nicheWhere(niche: string) {
+  const n = niche.trim();
+  return {
+    OR: [
+      { category: n },                              // the only niche on the site
+      { category: { startsWith: `${n},` } },        // first in the list
+      { category: { endsWith: `,${n}` } },          // last, no space
+      { category: { endsWith: `, ${n}` } },         // last, with a space
+      { category: { contains: `,${n},` } },         // in the middle, no spaces
+      { category: { contains: `, ${n},` } },        // in the middle, with a space
+    ],
+  };
+}

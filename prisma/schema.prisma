@@ -49,9 +49,20 @@ model Listing {
   category       String   // comma-separated niches
   country        String
   language       String   @default("English")
-  domainRating   Int       @default(0)
+  domainRating   Int       @default(0) // Ahrefs DR. Always fetched, even when DA is displayed.
   monthlyTraffic Int       @default(0)
   metricsUpdatedAt DateTime? // last time DR + traffic were fetched from Ahrefs
+  // Which authority number buyers see for this site. Some sites score poorly on
+  // Ahrefs DR but well on Moz DA, so a publisher may choose to show DA instead.
+  // We are not connected to Moz, so DA is a publisher-supplied claim - which is
+  // exactly why domainRating above is still fetched and kept for admins.
+  authorityType   String   @default("dr") // "dr" (Ahrefs, automatic) | "da" (publisher-entered)
+  domainAuthority Int      @default(0)    // only meaningful when authorityType = "da"
+  // The number actually on display, denormalised so the marketplace can filter
+  // and the home page can rank in one indexed query. Postgres cannot ORDER BY a
+  // value that depends on another column's contents, so this is kept in step by
+  // authorityFor() in lib/authority.ts - never set it by hand.
+  authorityScore  Int      @default(0)
   // Which buyer-pricing rule applies. Sites listed before the tiered pricing
   // launch keep "flat30" (+$30) for life; everything new is created as "tiered".
   markupModel    String   @default("flat30")
@@ -71,6 +82,7 @@ model Listing {
 
   @@index([status])
   @@index([publisherId])
+  @@index([authorityScore])
 }
 
 model Order {
