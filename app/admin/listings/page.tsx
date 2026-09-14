@@ -40,7 +40,7 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
           )}
           {staleCount > 0 && (
             <form action={refreshListingMetricsAction}>
-              <button className="btn-ghost btn-sm" type="submit">Refresh DR &amp; traffic ({staleCount} due)</button>
+              <button className="btn-ghost btn-sm" type="submit">Refresh DR ({staleCount} due)</button>
             </form>
           )}
           {pendingCount > 0 && (

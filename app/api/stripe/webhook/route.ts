@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import { emailEnabled, sendNewOrderEmails, sendDepositReceipt, sendDepositAdmin } from "@/lib/email";
 import { netDeposit } from "@/lib/money";
+import { dueAtFrom } from "@/lib/orders";
+import { MARKUP_REQUESTED } from "@/lib/money";
 
 // Stripe needs the raw body to verify the signature.
 export const runtime = "nodejs";
@@ -55,8 +57,51 @@ export async function POST(req: NextRequest) {
 
         if (tx.purpose === "order" && tx.orderId) {
           const order = await prisma.order.findUnique({ where: { id: tx.orderId } });
-          if (order && order.status === "pending_payment") {
-            await prisma.order.update({ where: { id: tx.orderId }, data: { status: "funded" } });
+          // Card-funded orders get the same turnaround deadline as wallet-funded
+          // ones. The clock starts here, when the money is actually held.
+          // Buyer-requested sites get none - see payFromWalletAction.
+          const listing = order
+            ? await prisma.listing.findUnique({ where: { id: order.listingId } })
+            : null;
+
+          // Guarded: the decision is made by the write, not by the read above.
+          // A wallet payment or a cancel can land between the two, and deciding
+          // from the stale read would charge the buyer twice for one order.
+          const fundedNow = order
+            ? (
+                await prisma.order.updateMany({
+                  where: { id: tx.orderId, status: "pending_payment" },
+                  data: {
+                    status: "funded",
+                    dueAt: listing?.markupModel === MARKUP_REQUESTED ? null : dueAtFrom(order.turnaroundDays),
+                  },
+                })
+              ).count > 0
+            : false;
+
+          // The order was cancelled, already funded, or gone (a deleted listing
+          // cascades its orders away) between opening Stripe Checkout and
+          // paying. The charge is real, so it becomes wallet balance rather than
+          // vanishing - the buyer can spend it on another placement.
+          if (!fundedNow) {
+            console.error(
+              `[stripe-webhook] order ${tx.orderId} was ${order ? order.status : "missing"} and could not be funded - crediting ${tx.amountCents}c to buyer ${tx.userId} as balance instead.`
+            );
+            await prisma.$transaction([
+              prisma.user.update({ where: { id: tx.userId }, data: { balanceCents: { increment: tx.amountCents } } }),
+              prisma.walletTx.create({
+                data: {
+                  userId: tx.userId,
+                  kind: "topup",
+                  amountCents: tx.amountCents,
+                  method: "card",
+                  note: `Card payment for order #${tx.orderId}, which was no longer open - added to balance`,
+                },
+              }),
+            ]);
+          }
+
+          if (fundedNow && order) {
             // Same reasoning as the deposit branch: the order is funded, so a
             // notification failure must never bubble up and cost us the emails.
             try {

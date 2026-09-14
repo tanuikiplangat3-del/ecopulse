@@ -1,12 +1,15 @@
-// Shared DR + monthly-traffic refresh, used by both the admin button and the
-// weekly background scheduler. Everything Ahrefs-related lives in lib/ahrefs.ts;
-// this file only decides which listings are due and writes the results back.
+// Shared Domain Rating refresh, used by both the admin button and the weekly
+// background scheduler. Everything Ahrefs-related lives in lib/ahrefs.ts; this
+// file only decides which listings are due and writes the results back.
+//
+// Monthly traffic is NOT touched here. It is a publisher-entered number now, so
+// a refresh must never overwrite it.
 
 import { prisma } from "@/lib/prisma";
-import { fetchDomainMetrics } from "@/lib/ahrefs";
+import { fetchDomainRating } from "@/lib/ahrefs";
 import { authorityScoreFor } from "@/lib/authority";
 
-/** How old a listing's metrics may get before they are refreshed again. */
+/** How old a listing's DR may get before it is refreshed again. */
 export const REFRESH_AFTER_DAYS = 7;
 
 export type RefreshResult = {
@@ -62,12 +65,12 @@ export async function refreshDueMetrics(opts: {
   for (let i = 0; i < due.length; i += parallel) {
     if (Date.now() > deadline) break;
     const chunk = due.slice(i, i + parallel);
-    const results = await Promise.all(chunk.map((l) => fetchDomainMetrics(l.domain)));
+    const results = await Promise.all(chunk.map((l) => fetchDomainRating(l.domain)));
     for (let j = 0; j < chunk.length; j++) {
       processed++;
-      const { dr, traffic, ok } = results[j];
-      // Ahrefs did not answer. Keep the existing numbers, but push this listing
-      // back a day so one unreachable domain cannot block the queue forever.
+      const { dr, ok } = results[j];
+      // Ahrefs did not answer. Keep the existing DR, but push this listing back
+      // a day so one unreachable domain cannot block the queue forever.
       if (!ok) {
         failed++;
         await prisma.listing.update({
@@ -78,14 +81,14 @@ export async function refreshDueMetrics(opts: {
       }
       // Refresh the real Ahrefs DR for every site, including ones that display
       // a publisher-supplied DA - admins need the true number to sanity-check
-      // the claim, and traffic comes back in the same call anyway.
-      // authorityScore then follows whichever number is on display: it moves
-      // with DR on a DR site and stays put on a DA site.
+      // the claim. authorityScore then follows whichever number is on display:
+      // it moves with DR on a DR site and stays put on a DA site.
+      // monthlyTraffic is deliberately absent from this update: the publisher
+      // owns that number now.
       await prisma.listing.update({
         where: { id: chunk[j].id },
         data: {
           domainRating: dr,
-          monthlyTraffic: traffic,
           metricsUpdatedAt: new Date(),
           authorityScore: authorityScoreFor({ ...chunk[j], domainRating: dr }),
         },

@@ -50,8 +50,8 @@ model Listing {
   country        String
   language       String   @default("English")
   domainRating   Int       @default(0) // Ahrefs DR. Always fetched, even when DA is displayed.
-  monthlyTraffic Int       @default(0)
-  metricsUpdatedAt DateTime? // last time DR + traffic were fetched from Ahrefs
+  monthlyTraffic Int       @default(0) // publisher-entered monthly organic visits - NOT fetched
+  metricsUpdatedAt DateTime? // last time DR was fetched from Ahrefs
   // Which authority number buyers see for this site. Some sites score poorly on
   // Ahrefs DR but well on Moz DA, so a publisher may choose to show DA instead.
   // We are not connected to Moz, so DA is a publisher-supplied claim - which is
@@ -103,14 +103,28 @@ model Order {
   amountCents    Int      @default(0) // what the buyer pays
   payoutCents    Int      @default(0) // what the publisher receives
   commissionRate String   @default("0")
-  status         String   @default("pending_payment") // pending_payment | funded | live | completed | cancelled
+  status         String   @default("pending_payment") // pending_payment | funded | in_progress | live | completed | cancelled
   publisherPaid  Boolean  @default(false)
+  // Turnaround deadline. Set the moment the order is funded (createdAt is no
+  // use - an order can sit unpaid for days). The clock stops when the publisher
+  // submits the live URL; anything still funded or in progress past this
+  // instant is cancelled automatically and the buyer refunded.
+  // Null means no deadline: orders funded before this feature shipped.
+  dueAt          DateTime?
+  cancelReason   String?   // why it was cancelled, in the canceller's own words
+  // How much actually went back to the buyer's balance. 0 for an order that was
+  // cancelled before it was ever paid for, so the UI never claims a refund that
+  // never happened.
+  refundedCents  Int      @default(0)
+  cancelledBy    String?   // buyer | publisher | admin | system
+  cancelledAt    DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([buyerId])
   @@index([listingId])
   @@index([status])
+  @@index([dueAt])
 }
 
 model WalletTx {

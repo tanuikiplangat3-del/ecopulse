@@ -1,4 +1,5 @@
-// Weekly DR + traffic refresh, running inside the app itself.
+// Weekly Domain Rating refresh, running inside the app itself.
+// (Monthly traffic is publisher-entered and is never refreshed from Ahrefs.)
 //
 // Deliberately not an AWS cron / EventBridge job: this needs no extra AWS setup
 // and no public endpoint to secure. The container wakes up every few hours,
@@ -40,5 +41,5 @@ export function startMetricsScheduler() {
   started = true;
   setTimeout(runOnce, FIRST_RUN_DELAY_MS).unref?.();
   setInterval(runOnce, CHECK_EVERY_MS).unref?.();
-  console.log("[metrics] weekly refresh scheduler started");
+  console.log("[metrics] weekly DR refresh scheduler started");
 }

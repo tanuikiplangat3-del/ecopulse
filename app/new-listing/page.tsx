@@ -20,8 +20,8 @@ export default async function NewListingPage({
     <div className="mx-auto max-w-2xl">
       <h1 className="h2 mb-1">{first ? "Add your first website" : "Add a website"}</h1>
       <p className="muted mb-6">
-        List a website you own so buyers can acquire placements. Domain Rating and monthly
-        traffic are fetched automatically from Ahrefs.
+        List a website you own so buyers can acquire placements. Domain Rating is looked up
+        from Ahrefs for you; monthly traffic is the one number you enter yourself.
       </p>
       <Flash searchParams={searchParams} />
 
@@ -53,6 +53,26 @@ export default async function NewListingPage({
           <label className="field mb-0">
             <span>Turnaround (days)</span>
             <input className="input" name="tatDays" type="number" min="1" defaultValue="7" />
+            <span className="muted mt-1 block text-xs">
+              How long you normally need. Buyers choose their own turnaround when they order,
+              and an order is cancelled automatically if the link is not live by then.
+            </span>
+          </label>
+          <label className="field mb-0">
+            <span>Monthly traffic</span>
+            <input
+              className="input"
+              name="monthlyTraffic"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="12000"
+              required
+            />
+            <span className="muted mt-1 block text-xs">
+              Monthly organic visits. Enter the number yourself &mdash; we no longer pull this
+              from Ahrefs. Enter 0 if the site is brand new.
+            </span>
           </label>
         </div>
 

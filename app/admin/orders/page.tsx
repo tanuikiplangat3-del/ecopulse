@@ -5,6 +5,7 @@ import { money } from "@/lib/money";
 import { StatusBadge, Flash } from "@/components/ui";
 import { markPublisherPaidAction } from "@/app/actions/admin";
 import { adminConfirmLiveAction } from "@/app/actions/orders";
+import Countdown from "@/components/Countdown";
 
 export const metadata = { title: "Orders" };
 
@@ -90,7 +91,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: { [k
         <div className="card overflow-x-auto">
           <table className="table-wt">
             <thead>
-              <tr><th>#</th><th>Site</th><th>Buyer</th><th>Publisher</th><th>Amount</th><th>Status</th><th></th></tr>
+              <tr><th>#</th><th>Site</th><th>Buyer</th><th>Publisher</th><th>Amount</th><th>Turnaround left</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {inProgress.map((o) => (
@@ -100,6 +101,9 @@ export default async function AdminOrders({ searchParams }: { searchParams: { [k
                   <td className="muted">{o.buyer.name}</td>
                   <td className="muted">{o.listing.publisher.name}</td>
                   <td>{money(o.amountCents)}</td>
+                  <td className="whitespace-nowrap">
+                    {o.dueAt ? <Countdown dueAt={o.dueAt.toISOString()} /> : <span className="muted">—</span>}
+                  </td>
                   <td><StatusBadge status={o.status} /></td>
                   <td><Link href={`/orders/${o.id}`} className="text-wt-green whitespace-nowrap">Open →</Link></td>
                 </tr>

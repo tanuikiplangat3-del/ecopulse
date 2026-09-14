@@ -115,7 +115,8 @@ export async function approveAllListingsAction() {
 }
 
 /**
- * Refresh DR + monthly traffic on demand. The app already does this on its own
+ * Refresh Domain Rating on demand. Monthly traffic is publisher-entered and is
+ * deliberately left alone here. The app already does this on its own
  * every 7 days (see lib/metrics-scheduler.ts); this button is for when an admin
  * does not want to wait - after a big bulk upload, for example.
  *
@@ -124,7 +125,7 @@ export async function approveAllListingsAction() {
 export async function refreshListingMetricsAction() {
   await requireRole("admin");
   if (!ahrefsEnabled()) {
-    redirect(`/admin/listings?error=${q("The Ahrefs API key is not set on the server, so DR and traffic cannot be fetched.")}`);
+    redirect(`/admin/listings?error=${q("The Ahrefs API key is not set on the server, so DR cannot be fetched.")}`);
   }
 
   const r = await refreshDueMetrics({ maxItems: 600, budgetMs: 25_000, parallel: 10 });
@@ -137,7 +138,7 @@ export async function refreshListingMetricsAction() {
   revalidatePath("/marketplace");
   revalidatePath("/");
   const msg =
-    `Refreshed ${r.updated} website(s).` +
+    `Refreshed the Domain Rating on ${r.updated} website(s).` +
     (r.failed ? ` ${r.failed} could not be reached - they will be retried automatically.` : "") +
     (r.remaining ? ` ${r.remaining} still to go - click Refresh again to continue.` : " All websites are up to date.");
   redirect(`/admin/listings?success=${q(msg)}`);

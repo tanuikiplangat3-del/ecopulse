@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { money, trafficShort } from "@/lib/money";
 import { StatusBadge, Flash, EmptyState } from "@/components/ui";
-import { deleteListingAction, changeAuthorityAction } from "@/app/actions/listings";
+import { deleteListingAction, changeAuthorityAction, changeTrafficAction } from "@/app/actions/listings";
 import { authorityFor } from "@/lib/authority";
 
 export default async function MyListingsPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
@@ -76,6 +76,31 @@ export default async function MyListingsPage({ searchParams }: { searchParams: {
                           <p className="muted text-xs">
                             Changing this sends the website back to our team to check before
                             buyers see it.
+                          </p>
+                          <button className="btn-primary btn-sm" type="submit">Save</button>
+                        </form>
+                      </details>
+                      {/* Traffic is publisher-entered now, so it has to be
+                          editable here - nothing refreshes it. Same review rule
+                          as DA: a change sends the site back to our team. */}
+                      <details className="w-full">
+                        <summary className="btn-ghost btn-sm cursor-pointer list-none">
+                          Change traffic
+                        </summary>
+                        <form action={changeTrafficAction} className="mt-2 space-y-2">
+                          <input type="hidden" name="id" value={l.id} />
+                          <input
+                            className="input"
+                            name="monthlyTraffic"
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder="Monthly visits, e.g. 12000"
+                            defaultValue={l.monthlyTraffic || ""}
+                          />
+                          <p className="muted text-xs">
+                            Monthly organic visits. Changing this sends the website back to our
+                            team to check before buyers see it.
                           </p>
                           <button className="btn-primary btn-sm" type="submit">Save</button>
                         </form>

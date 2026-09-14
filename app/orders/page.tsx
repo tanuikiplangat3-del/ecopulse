@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { money } from "@/lib/money";
 import { one } from "@/lib/util";
 import { StatusBadge, Flash, EmptyState } from "@/components/ui";
+import Countdown from "@/components/Countdown";
 
 export default async function OrdersPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   const user = await requireUser();
@@ -63,6 +64,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                 <th>#</th><th>Site</th>
                 {user.role !== "buyer" && <th>Buyer</th>}
                 <th>{user.role === "publisher" ? "Payout" : "Amount"}</th>
+                <th>Turnaround left</th>
                 <th>Status</th><th>Live URL</th><th></th>
               </tr>
             </thead>
@@ -73,6 +75,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                   <td className="font-semibold">{o.listing.domain}</td>
                   {user.role !== "buyer" && <td className="muted">{o.buyer.name}</td>}
                   <td>{money(user.role === "publisher" ? o.payoutCents : o.amountCents)}</td>
+                  <td className="whitespace-nowrap">
+                    {o.dueAt && ["funded", "in_progress"].includes(o.status)
+                      ? <Countdown dueAt={o.dueAt.toISOString()} />
+                      : <span className="muted">—</span>}
+                  </td>
                   <td><StatusBadge status={o.status} /></td>
                   <td>
                     {o.liveUrl ? (

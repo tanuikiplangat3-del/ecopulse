@@ -20,6 +20,9 @@ const config: Config = {
           greenSoft: "#4ca56b",
           yellow: "#ffd952",
           blue: "#2b4dff",
+          // Measured in Figma alongside the other brand variables
+          // (see 11-design-system.md). Used for overdue turnaround countdowns.
+          red: "#ef3e3b",
           muted: "rgba(255,255,255,0.60)",
           faint: "rgba(255,255,255,0.50)",
           surface1: "rgba(255,255,255,0.10)",

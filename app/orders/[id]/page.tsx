@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { money } from "@/lib/money";
 import { StatusBadge, Flash } from "@/components/ui";
-import { payFromWalletAction, payWithStripeAction, submitLiveAction, confirmLiveAction, cancelOrderAction, confirmReceiptAction, buyerSubmitLiveAction } from "@/app/actions/orders";
+import { payFromWalletAction, payWithStripeAction, submitLiveAction, confirmLiveAction, cancelOrderAction, confirmReceiptAction, buyerSubmitLiveAction, publisherRejectOrderAction, adminCancelOrderAction } from "@/app/actions/orders";
+import Countdown from "@/components/Countdown";
 import { MARKUP_REQUESTED } from "@/lib/money";
 import { stripeEnabled } from "@/lib/stripe";
 
@@ -30,6 +31,7 @@ export default async function OrderPage({
 
   // Buyer-requested sites: the publisher has no account here, so the details we
   // need in order to pay them live on the original request.
+  const inFlight = ["funded", "in_progress"].includes(order!.status);
   const isRequested = order!.listing.markupModel === MARKUP_REQUESTED;
   const siteRequest = isRequested && order!.listing.siteRequestId
     ? await prisma.siteRequest.findUnique({ where: { id: order!.listing.siteRequestId } })
@@ -46,6 +48,24 @@ export default async function OrderPage({
         <StatusBadge status={order!.status} />
       </div>
       <Flash searchParams={searchParams} />
+
+      {/* Turnaround countdown. Only while the publisher still owes work: once the
+          live URL is in, dueAt is cleared and this disappears. */}
+      {inFlight && order!.dueAt && (
+        <div className="card mb-5 border-wt-yellow/40">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="muted text-xs">Turnaround remaining</p>
+              <Countdown dueAt={order!.dueAt.toISOString()} className="text-2xl" />
+            </div>
+            <p className="muted max-w-sm text-xs">
+              {isPublisher
+                ? `Publish the link and submit the live URL before this runs out. When it reaches zero the order is cancelled automatically and the buyer is refunded.`
+                : `The publisher has ${order!.turnaroundDays} days to publish. If the link is not live by then, the order cancels itself and ${money(order!.amountCents)} goes back to your balance automatically.`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {isRequested && (
         <div className="card mb-5 border-wt-yellow/40">
@@ -141,6 +161,19 @@ export default async function OrderPage({
         </div>
       )}
 
+      {isBuyer && inFlight && (
+        <div className="card mb-5">
+          <h2 className="h3 mb-2">This order is paid for</h2>
+          <p className="muted text-sm">
+            {money(order!.amountCents)} is being held until the link is live, so this order can no
+            longer be cancelled from your side. If the publisher cannot run the post they will
+            reject it, and if the turnaround runs out it cancels itself &mdash; either way the
+            money returns to your balance automatically. Need it stopped sooner? Email{" "}
+            <a className="text-wt-green" href="mailto:hello@welcometomorrow.io">hello@welcometomorrow.io</a>.
+          </p>
+        </div>
+      )}
+
       {isPublisher && !isRequested && order!.status === "funded" && (
         <div className="card">
           <h2 className="h3 mb-3">Confirm you received this order</h2>
@@ -163,6 +196,56 @@ export default async function OrderPage({
             </label>
             <button className="btn-primary" type="submit">Submit live URL</button>
           </form>
+        </div>
+      )}
+
+      {isPublisher && !isRequested && inFlight && (
+        <div className="card mt-5 border-white/10">
+          <details>
+            <summary className="cursor-pointer list-none text-sm font-semibold text-white/80">
+              Can&rsquo;t run this guest post? Reject it &rarr;
+            </summary>
+            <p className="muted mb-4 mt-3 text-sm">
+              Rejecting ends the order and refunds the buyer in full. Please say why &mdash; the
+              buyer is told your reason, and our team sees it too.
+            </p>
+            <form action={publisherRejectOrderAction} className="space-y-3">
+              <input type="hidden" name="orderId" value={order!.id} />
+              <label className="field mb-0">
+                <span>Reason for rejecting</span>
+                <textarea
+                  className="textarea"
+                  name="reason"
+                  minLength={10}
+                  required
+                  placeholder="For example: the anchor text is for a niche we do not accept, or the article does not meet our editorial rules."
+                />
+              </label>
+              <button className="btn-danger" type="submit">Reject guest post &amp; refund buyer</button>
+            </form>
+          </details>
+        </div>
+      )}
+
+      {isAdmin && inFlight && (
+        <div className="card mt-5 border-white/10">
+          <details>
+            <summary className="cursor-pointer list-none text-sm font-semibold text-white/80">
+              Admin: cancel this order &rarr;
+            </summary>
+            <p className="muted mb-4 mt-3 text-sm">
+              Cancels the order and returns {money(order!.amountCents)} to the buyer&rsquo;s balance.
+              The reason is emailed to both the buyer and the publisher.
+            </p>
+            <form action={adminCancelOrderAction} className="space-y-3">
+              <input type="hidden" name="orderId" value={order!.id} />
+              <label className="field mb-0">
+                <span>Reason for cancelling</span>
+                <textarea className="textarea" name="reason" minLength={10} required />
+              </label>
+              <button className="btn-danger" type="submit">Cancel order &amp; refund buyer</button>
+            </form>
+          </details>
         </div>
       )}
 
@@ -199,9 +282,39 @@ export default async function OrderPage({
       {order!.status === "completed" && (
         <div className="card flash-success">This order is complete{order!.publisherPaid ? " and the publisher has been paid." : "."}</div>
       )}
+
+      {order!.status === "cancelled" && (
+        <div className="card border-wt-red/40">
+          <h2 className="h3 mb-2">This order was cancelled</h2>
+          <p className="muted text-sm">
+            {CANCELLED_LABEL[order!.cancelledBy || ""] || "Cancelled."}
+            {order!.cancelledAt ? ` on ${order!.cancelledAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}` : ""}.
+          </p>
+          {order!.cancelReason && (
+            <p className="mt-3 text-sm text-white/80">
+              <span className="muted">Reason: </span>
+              {order!.cancelReason}
+            </p>
+          )}
+          {order!.refundedCents > 0 ? (
+            <p className="muted mt-3 text-sm">
+              {money(order!.refundedCents)} was returned to {isBuyer ? "your" : "the buyer's"} balance.
+            </p>
+          ) : (
+            <p className="muted mt-3 text-sm">Nothing was charged for this order.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+const CANCELLED_LABEL: Record<string, string> = {
+  buyer: "Cancelled by the buyer before payment",
+  publisher: "The publisher rejected this guest post",
+  admin: "Cancelled by our team",
+  system: "Cancelled automatically because the turnaround time ran out",
+};
 
 function Info({ label, value }: { label: string; value: string }) {
   return (

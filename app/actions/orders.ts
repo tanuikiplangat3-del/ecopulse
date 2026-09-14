@@ -8,7 +8,14 @@ import { requireRole, requireUser } from "@/lib/auth";
 import { buyerPrice, listingBaseCents, commissionRate, MARKUP_REQUESTED } from "@/lib/money";
 import { hasRequesterRate } from "@/lib/requester";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
-import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin, sendOrderConfirmedEmails } from "@/lib/email";
+import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin, sendOrderConfirmedEmails, sendOrderCancelledEmails } from "@/lib/email";
+import {
+  cancelFundedOrder,
+  dueAtFrom,
+  CANCELLED_BY_ADMIN,
+  CANCELLED_BY_BUYER,
+  CANCELLED_BY_PUBLISHER,
+} from "@/lib/orders";
 
 const q = (s: string) => encodeURIComponent(s);
 
@@ -87,11 +94,47 @@ export async function payFromWalletAction(formData: FormData) {
   if ((fresh?.balanceCents ?? 0) < order!.amountCents) {
     redirect(`/orders/${orderId}?error=${q("Not enough wallet balance. Top up or pay by card.")}`);
   }
-  await prisma.$transaction([
-    prisma.user.update({ where: { id: user.id }, data: { balanceCents: { decrement: order!.amountCents } } }),
-    prisma.walletTx.create({ data: { userId: user.id, kind: "spend", amountCents: order!.amountCents, note: `Order #${orderId}` } }),
-    prisma.order.update({ where: { id: orderId }, data: { status: "funded" } }),
-  ]);
+  // That check is only a fast, friendly answer. The one that counts is the
+  // conditional decrement inside the transaction below - two different orders
+  // paid from the same wallet at the same instant would both pass this one and
+  // drive the balance negative.
+  // The turnaround clock starts the moment the money is held, not when the
+  // order was created - an unpaid order can sit for days and that time is not
+  // the publisher's to lose.
+  //
+  // Buyer-requested sites get NO deadline. Their publisher has no account here
+  // and cannot submit a live URL, so only the buyer can ever close the order
+  // out; a countdown would cancel and refund a placement that actually ran.
+  const listing = await prisma.listing.findUnique({ where: { id: order!.listingId } });
+  const dueAt = listing?.markupModel === MARKUP_REQUESTED ? null : dueAtFrom(order!.turnaroundDays);
+
+  // The status change is an updateMany guarded on the order still being unpaid,
+  // inside the transaction. Two submits landing together would otherwise both
+  // read "pending_payment" and both decrement the balance.
+  const funded = await prisma.$transaction(async (tx) => {
+    const changed = await tx.order.updateMany({
+      where: { id: orderId, status: "pending_payment" },
+      data: { status: "funded", dueAt },
+    });
+    if (changed.count === 0) return "gone";
+    // Conditional decrement: the balance is only taken if it is still there.
+    // A plain decrement would let two simultaneous payments from one wallet
+    // both succeed and leave the buyer on a negative balance.
+    const paid = await tx.user.updateMany({
+      where: { id: user.id, balanceCents: { gte: order!.amountCents } },
+      data: { balanceCents: { decrement: order!.amountCents } },
+    });
+    if (paid.count === 0) throw new Error("INSUFFICIENT_BALANCE");
+    await tx.walletTx.create({ data: { userId: user.id, kind: "spend", amountCents: order!.amountCents, note: `Order #${orderId}` } });
+    return "ok";
+  }).catch((e: any) => {
+    // The throw rolls the status change back with it, so the order is still
+    // payable and nothing was taken.
+    if (String(e?.message).includes("INSUFFICIENT_BALANCE")) return "broke";
+    throw e;
+  });
+  if (funded === "gone") redirect(`/orders/${orderId}?error=${q("That order has already been paid for or cancelled.")}`);
+  if (funded === "broke") redirect(`/orders/${orderId}?error=${q("Not enough wallet balance - another payment may have just gone through. Top up or pay by card.")}`);
   await notifyPublisherFunded(orderId);
   revalidatePath("/orders");
   redirect(`/orders/${orderId}?success=${q("Order funded from your balance.")}`);
@@ -134,7 +177,19 @@ export async function submitLiveAction(formData: FormData) {
     redirect(`/orders/${orderId}?error=${q("Confirm you received the order first.")}`);
   if (!/^https?:\/\//.test(liveUrl)) redirect(`/orders/${orderId}?error=${q("Enter a valid live URL.")}`);
 
-  await prisma.order.update({ where: { id: orderId }, data: { status: "live", liveUrl } });
+  // Delivered. Clear the deadline so the sweeper can never cancel an order
+  // whose link is already up and waiting on the buyer to look at it.
+  //
+  // Guarded on the order still being in flight: the sweeper may have cancelled
+  // and refunded it in the moments since the page was loaded, and an unguarded
+  // update would put a refunded order back on the publisher-payment queue.
+  const moved = await prisma.order.updateMany({
+    where: { id: orderId, status: { in: ["funded", "in_progress"] } },
+    data: { status: "live", liveUrl, dueAt: null },
+  });
+  if (moved.count === 0) {
+    redirect(`/orders/${orderId}?error=${q("This order is no longer open - it was cancelled or already completed. Please contact us before publishing anything further.")}`);
+  }
   if (emailEnabled()) {
     if (order!.buyer) {
       await sendOrderNotice(order!.buyer.email, "Your link is live", `The publisher submitted the live URL for order #${orderId}: ${liveUrl}. Please confirm in your dashboard.`);
@@ -167,10 +222,13 @@ export async function buyerSubmitLiveAction(formData: FormData) {
   if (!/^https?:\/\//.test(liveUrl))
     redirect(`/orders/${orderId}?error=${q("Enter the full live URL, starting with https://")}`);
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { status: "completed", liveUrl },
+  const closed = await prisma.order.updateMany({
+    where: { id: orderId, status: { in: ["funded", "in_progress", "live"] } },
+    data: { status: "completed", liveUrl, dueAt: null },
   });
+  if (closed.count === 0) {
+    redirect(`/orders/${orderId}?error=${q("This order is no longer open - it was cancelled or already completed.")}`);
+  }
   if (emailEnabled()) {
     await sendLiveUrlAdmin(orderId, order!.listing.domain, liveUrl);
   }
@@ -185,7 +243,8 @@ export async function confirmLiveAction(formData: FormData) {
   const orderId = parseInt(String(formData.get("orderId") || "0"));
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order || order.buyerId !== user.id || order.status !== "live") redirect(`/orders?error=${q("Cannot confirm this order.")}`);
-  await prisma.order.update({ where: { id: orderId }, data: { status: "completed" } });
+  const done = await prisma.order.updateMany({ where: { id: orderId, status: "live" }, data: { status: "completed" } });
+  if (done.count === 0) redirect(`/orders/${orderId}?error=${q("This order is no longer awaiting your confirmation.")}`);
   await notifyOrderConfirmed(orderId);
   revalidatePath("/orders");
   redirect(`/orders/${orderId}?success=${q("Order completed. Thank you!")}`);
@@ -198,7 +257,8 @@ export async function adminConfirmLiveAction(formData: FormData) {
   const orderId = parseInt(String(formData.get("orderId") || "0"));
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { buyer: true } });
   if (!order || order.status !== "live") redirect(`/admin/orders?error=${q("Order is not awaiting confirmation.")}`);
-  await prisma.order.update({ where: { id: orderId }, data: { status: "completed" } });
+  const done = await prisma.order.updateMany({ where: { id: orderId, status: "live" }, data: { status: "completed" } });
+  if (done.count === 0) redirect(`/admin/orders?error=${q("Order is not awaiting confirmation.")}`);
   if (emailEnabled() && order!.buyer) {
     await sendOrderNotice(order!.buyer.email, "Your order is complete", `Order #${orderId} has been confirmed live and marked complete.`);
   }
@@ -207,15 +267,139 @@ export async function adminConfirmLiveAction(formData: FormData) {
   redirect(`/admin/orders?success=${q("Order confirmed live.")}`);
 }
 
+/**
+ * Cancel an order that has NOT been paid for yet.
+ *
+ * This is the only cancellation a buyer may make. The moment they fund an
+ * order the money is held and the publisher starts work, so from then on it is
+ * the publisher's to reject and the admin's to cancel - see the two actions
+ * below. Nothing is refunded here because nothing was ever taken.
+ */
 export async function cancelOrderAction(formData: FormData) {
   const user = await requireUser();
   const orderId = parseInt(String(formData.get("orderId") || "0"));
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) redirect(`/orders?error=${q("Order not found.")}`);
-  const canCancel = (order.buyerId === user.id || user.role === "admin") && order.status === "pending_payment";
-  if (!canCancel) redirect(`/orders/${orderId}?error=${q("This order can no longer be cancelled.")}`);
-  await prisma.order.update({ where: { id: orderId }, data: { status: "cancelled" } });
-  redirect(`/orders/${orderId}?success=${q("Order cancelled.")}`);
+  if (order.buyerId !== user.id && user.role !== "admin") {
+    redirect(`/orders/${orderId}?error=${q("This is not your order.")}`);
+  }
+  if (order.status !== "pending_payment") {
+    redirect(
+      `/orders/${orderId}?error=${q(
+        "This order has already been paid for, so it can no longer be cancelled here. The publisher can reject it, or contact us and we will cancel it for you."
+      )}`
+    );
+  }
+  // Guarded on the order still being unpaid. A card payment can land between
+  // the page loading and this click; without the guard the cancel would write
+  // straight over a funded order and the buyer would be charged for nothing.
+  const cancelled = await prisma.order.updateMany({
+    where: { id: orderId, status: "pending_payment" },
+    data: {
+      status: "cancelled",
+      cancelledBy: user.role === "admin" ? CANCELLED_BY_ADMIN : CANCELLED_BY_BUYER,
+      cancelledAt: new Date(),
+      cancelReason: "Cancelled before payment.",
+    },
+  });
+  if (cancelled.count === 0) {
+    redirect(`/orders/${orderId}?error=${q("Your payment came through just now, so this order is already funded and can no longer be cancelled here.")}`);
+  }
+  revalidatePath("/orders");
+  redirect(`/orders/${orderId}?success=${q("Order cancelled. Nothing was charged.")}`);
+}
+
+/**
+ * The publisher rejects the guest post. This is their way out of an order they
+ * cannot or will not fulfil, and it is the reason the buyer no longer has a
+ * cancel button: somebody has to be able to end a funded order, and it should
+ * be the side that knows whether the post can run.
+ *
+ * The held amount goes straight back onto the buyer's balance.
+ */
+export async function publisherRejectOrderAction(formData: FormData) {
+  const user = await requireRole("publisher");
+  const orderId = parseInt(String(formData.get("orderId") || "0"));
+  const reason = String(formData.get("reason") || "").trim();
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { listing: { include: { publisher: true } }, buyer: true },
+  });
+  if (!order || order.listing.publisherId !== user.id) redirect(`/orders?error=${q("Not your order.")}`);
+  if (!["funded", "in_progress"].includes(order!.status)) {
+    redirect(`/orders/${orderId}?error=${q("This order can no longer be rejected.")}`);
+  }
+  // A reason is not optional. The buyer is losing a placement they paid for and
+  // is owed an explanation, and without one the admin desk cannot tell a bad
+  // fit from a publisher quietly walking away from every order.
+  if (reason.length < 10) {
+    redirect(`/orders/${orderId}?error=${q("Please write a short reason (at least 10 characters) so we can tell the buyer why.")}`);
+  }
+
+  const res = await cancelFundedOrder(orderId, { by: CANCELLED_BY_PUBLISHER, reason });
+  if (!res) redirect(`/orders/${orderId}?error=${q("This order has already been cancelled or completed.")}`);
+
+  // The refund is already committed. A mail failure must never throw here, or
+  // the publisher sees an error page for an action that actually succeeded and
+  // retrying just tells them it was already cancelled.
+  if (emailEnabled()) {
+    try {
+      await sendOrderCancelledEmails({
+        buyerEmail: order!.buyer?.email,
+        publisherEmail: order!.listing.publisher?.email,
+        domain: order!.listing.domain,
+        orderId,
+        refundedCents: res!.refundedCents,
+        by: CANCELLED_BY_PUBLISHER,
+        reason,
+      });
+    } catch (e: any) {
+      console.error(`[orders] rejection email for #${orderId} failed: ${e?.message || e}`);
+    }
+  }
+  revalidatePath("/orders");
+  redirect(`/orders/${orderId}?success=${q("Guest post rejected. The buyer has been refunded and told why.")}`);
+}
+
+/** Admin cancels a funded order, with a reason. Refunds the buyer's balance. */
+export async function adminCancelOrderAction(formData: FormData) {
+  const user = await requireUser();
+  if (user.role !== "admin") redirect(`/orders?error=${q("Admins only.")}`);
+  const orderId = parseInt(String(formData.get("orderId") || "0"));
+  const reason = String(formData.get("reason") || "").trim();
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { listing: { include: { publisher: true } }, buyer: true },
+  });
+  if (!order) redirect(`/admin/orders?error=${q("Order not found.")}`);
+  if (!["funded", "in_progress"].includes(order!.status)) {
+    redirect(`/orders/${orderId}?error=${q("Only a funded or in-progress order can be cancelled this way.")}`);
+  }
+  if (reason.length < 10) {
+    redirect(`/orders/${orderId}?error=${q("Please write a short reason (at least 10 characters). It is sent to the buyer and the publisher.")}`);
+  }
+
+  const res = await cancelFundedOrder(orderId, { by: CANCELLED_BY_ADMIN, reason });
+  if (!res) redirect(`/orders/${orderId}?error=${q("This order has already been cancelled or completed.")}`);
+
+  if (emailEnabled()) {
+    try {
+      await sendOrderCancelledEmails({
+        buyerEmail: order!.buyer?.email,
+        publisherEmail: order!.listing.publisher?.email,
+        domain: order!.listing.domain,
+        orderId,
+        refundedCents: res!.refundedCents,
+        by: CANCELLED_BY_ADMIN,
+        reason,
+      });
+    } catch (e: any) {
+      console.error(`[orders] admin cancellation email for #${orderId} failed: ${e?.message || e}`);
+    }
+  }
+  revalidatePath("/admin/orders");
+  revalidatePath("/orders");
+  redirect(`/orders/${orderId}?success=${q(`Order cancelled and ${res!.refundedCents / 100} USD refunded to the buyer's balance.`)}`);
 }
 
 /** Order completed -> tell the publisher and the admin desk (starts the 72h clock). */
@@ -264,7 +448,17 @@ export async function confirmReceiptAction(formData: FormData) {
   if (!order || order.listing.publisherId !== user.id) redirect(`/orders?error=${q("Not your order.")}`);
   if (order!.status !== "funded") redirect(`/orders/${orderId}?error=${q("This order can't be confirmed.")}`);
 
-  await prisma.order.update({ where: { id: orderId }, data: { status: "in_progress" } });
+  // Guarded, for the same reason as submitLiveAction: an unguarded write here
+  // could drag an order the sweeper had just cancelled and refunded back into
+  // an in-flight status, where the next sweep would refund the buyer a second
+  // time.
+  const started = await prisma.order.updateMany({
+    where: { id: orderId, status: "funded" },
+    data: { status: "in_progress" },
+  });
+  if (started.count === 0) {
+    redirect(`/orders/${orderId}?error=${q("This order is no longer open - it was cancelled or already moved on.")}`);
+  }
   if (emailEnabled() && order!.buyer) {
     await sendOrderNotice(order!.buyer.email, "Your order is in progress", `The publisher has confirmed your order #${orderId} on ${order!.listing.domain} and started work. You'll be notified when the link is live.`);
   }

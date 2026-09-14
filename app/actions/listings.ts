@@ -8,7 +8,8 @@ import { requireRole } from "@/lib/auth";
 import { centsFromUsd, money, MARKUP_TIERED } from "@/lib/money";
 import { checkDuplicate, liveDomains, STATUS_CONFLICT } from "@/lib/duplicates";
 import { normalizeCountry } from "@/lib/data";
-import { fetchDomainMetrics } from "@/lib/ahrefs";
+import { fetchDomainRating } from "@/lib/ahrefs";
+import { parseTrafficCell, parseTrafficInput } from "@/lib/traffic";
 import {
   AUTHORITY_DA,
   authorityScoreFor,
@@ -23,18 +24,20 @@ const autoApprove = () => (process.env.AUTO_APPROVE_LISTINGS || "true") === "tru
 async function makeListing(publisherId: number, data: {
   domain: string; url?: string; category: string; country: string;
   language?: string; priceCents: number; linkType?: string; tatDays?: number; description?: string;
+  // Monthly traffic is typed in by the publisher - nothing fetches it.
+  monthlyTraffic?: number;
   // Which authority number this site displays. Omitted means DR, which is what
   // every site created before this feature used.
   authorityType?: string; domainAuthority?: number;
 }, opts: { skipAhrefs?: boolean; status?: string } = {}) {
   const domain = data.domain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   const url = (data.url || `https://${domain}`).trim();
-  // Auto-fetch DR + monthly traffic from Ahrefs (fails soft to 0). This runs
-  // even when the site will display DA: traffic is needed either way, DR comes
-  // back in the same call, and admins compare the two when approving.
-  const metrics = opts.skipAhrefs ? { dr: 0, traffic: 0, ok: false } : await fetchDomainMetrics(domain);
+  // Auto-fetch DR from Ahrefs (fails soft to 0). This runs even when the site
+  // will display DA, because admins compare the claim against the real DR when
+  // approving. Traffic is NOT fetched - it comes from the form.
+  const metrics = opts.skipAhrefs ? { dr: 0, ok: false } : await fetchDomainRating(domain);
   const dr = metrics.dr;
-  const traffic = metrics.traffic;
+  const traffic = Math.max(0, Math.round(data.monthlyTraffic || 0));
   const authority = {
     authorityType: authorityTypeOf(data.authorityType),
     domainRating: dr,
@@ -54,7 +57,7 @@ async function makeListing(publisherId: number, data: {
       domainAuthority: authority.domainAuthority,
       authorityScore: authorityScoreFor(authority),
       markupModel: MARKUP_TIERED, // new sites use tiered pricing; older ones keep +$30
-      // Only mark as fetched when Ahrefs actually answered, so the weekly
+      // Only mark DR as fetched when Ahrefs actually answered, so the weekly
       // refresh picks it up straight away if it did not.
       metricsUpdatedAt: metrics.ok ? new Date() : null,
       linkType: data.linkType || "guest_post",
@@ -76,6 +79,10 @@ export async function createListingAction(formData: FormData) {
   const linkType = String(formData.get("linkType") || "guest_post");
   const tatDays = parseInt(String(formData.get("tatDays") || "7")) || 7;
   const description = String(formData.get("description") || "").trim();
+  // Monthly traffic is entered by hand now. Blank or unreadable is refused
+  // rather than quietly stored as 0 - a site showing 0 traffic looks broken to
+  // buyers and there is no Ahrefs call coming along later to fix it.
+  const traffic = parseTrafficInput(formData.get("monthlyTraffic"));
   const first = String(formData.get("first") || "") === "1";
   // DR or DA. On DR we type nothing - Ahrefs fills it in below. On DA the
   // publisher supplies the number themselves, because we are not connected to
@@ -86,6 +93,9 @@ export async function createListingAction(formData: FormData) {
   if (!domain) redirect(`/new-listing?error=${q("Please enter your website domain.")}${first ? "&first=1" : ""}`);
   if (!country) redirect(`/new-listing?error=${q("Please choose a country.")}${first ? "&first=1" : ""}`);
   if (!priceUsd || priceUsd <= 0) redirect(`/new-listing?error=${q("Enter a valid price in USD.")}${first ? "&first=1" : ""}`);
+  if (traffic === null) {
+    redirect(`/new-listing?error=${q("Enter your monthly organic traffic as a number, for example 12000. Enter 0 if the site is brand new.")}${first ? "&first=1" : ""}`);
+  }
   // Choosing DA and then leaving the box blank would silently publish the site
   // on its Ahrefs DR - the opposite of what the publisher asked for. Stop.
   if (chosenAuthority === AUTHORITY_DA && daValue === null) {
@@ -106,6 +116,7 @@ export async function createListingAction(formData: FormData) {
     linkType,
     tatDays,
     description,
+    monthlyTraffic: traffic!,
     authorityType: chosenAuthority,
     domainAuthority: daValue || 0,
   }, {
@@ -148,9 +159,10 @@ export async function bulkUploadAction(formData: FormData) {
   };
 
   // Build every row first, then insert them in one go. No Ahrefs calls happen here:
-  // 1000 live lookups could never finish inside a single request. DR and monthly
-  // traffic are filled in afterwards by "Refresh DR & traffic" on the admin
-  // Listings page, which works through them in batches.
+  // 1000 live lookups could never finish inside a single request. DR is filled in
+  // afterwards by "Refresh DR" on the admin Listings page, which works through
+  // them in batches. Monthly traffic comes from the sheet's own traffic column -
+  // nothing fetches it later, so a row without one is reported back.
   const MAX_ROWS = 1000;
   const approved = autoApprove() ? "approved" : "pending";
   const toProcess = rows.slice(0, MAX_ROWS);
@@ -158,6 +170,9 @@ export async function bulkUploadAction(formData: FormData) {
   let skipped = 0;
   // How many rows carried a usable DA, so the confirmation can say so.
   let daRows = 0;
+  // Rows with no readable traffic figure. They are still listed (at 0) but the
+  // publisher is told how many, because no later job will fill them in.
+  let missingTraffic = 0;
   // Country cells that we could not match to a real country, and how many rows
   // used each one. Reported back so the sheet can be corrected, rather than
   // quietly filing those sites under a country nobody will find them in.
@@ -183,6 +198,11 @@ export async function bulkUploadAction(formData: FormData) {
     // leaves the site on DR. Junk must never become a real-looking score, so
     // parseDaCell decides, not this loop.
     const da = parseDaCell(get(row, ["da", "domain authority", "domainauthority", "moz da", "moz"]));
+    // Monthly traffic, typed in by the publisher. "12,000", "12k" and "1.2M" all
+    // read correctly; anything unusable leaves the site at 0 and is counted.
+    const traffic = parseTrafficCell(
+      get(row, ["traffic", "monthly traffic", "monthlytraffic", "organic traffic", "visits", "monthly visits", "sessions"])
+    );
     const price = parseFloat(priceStr.replace(/[^0-9.]/g, ""));
     if (!raw || !price || price <= 0) {
       skipped++;
@@ -196,6 +216,7 @@ export async function bulkUploadAction(formData: FormData) {
     // Counted here, after the skip checks, so the confirmation never credits a
     // DA on a row that was thrown away for a missing website or price.
     if (da !== null) daRows++;
+    if (traffic === null) missingTraffic++;
     data.push({
       publisherId: user.id,
       domain,
@@ -204,11 +225,12 @@ export async function bulkUploadAction(formData: FormData) {
       country,
       language,
       domainRating: 0,
-      monthlyTraffic: 0,
+      monthlyTraffic: traffic ?? 0,
       // No Ahrefs call happens during a bulk upload, so DR is still 0 here and
-      // gets filled in later by "Refresh DR & traffic". A DA row can therefore
-      // show its real number immediately, while a DR row shows 0 until the
-      // refresh runs - which is how bulk upload already behaved.
+      // gets filled in later by "Refresh DR". A DA row can therefore show its
+      // real number immediately, while a DR row shows 0 until the refresh runs -
+      // which is how bulk upload already behaved. Traffic is different: it is
+      // whatever the sheet said, and stays 0 if the sheet said nothing usable.
       authorityType: da !== null ? AUTHORITY_DA : undefined,
       domainAuthority: da || 0,
       authorityScore: da || 0,
@@ -272,9 +294,10 @@ export async function bulkUploadAction(formData: FormData) {
     (daRows
       ? ` ${daRows} site(s) had a Domain Authority in the DA column and will display DA instead of DR.`
       : "") +
-    (created - daRows > 0
-      ? ` Domain Rating and traffic for the other site(s) are added shortly.`
-      : " Traffic figures are added shortly.");
+    (missingTraffic
+      ? ` ${missingTraffic} row(s) had no readable monthly traffic and were listed at 0 - traffic is no longer fetched automatically, so add it on Websites (a live site goes back to our team for a quick check when you change it).`
+      : "") +
+    (created - daRows > 0 ? ` Domain Rating for the other site(s) is added shortly.` : "");
   redirect(first ? `/payout?first=1` : `/my-listings?success=${q(note)}`);
 }
 
@@ -365,6 +388,62 @@ export async function changeAuthorityAction(formData: FormData) {
       chosen === AUTHORITY_DA
         ? `Updated. ${listing!.domain} will show DA ${next.domainAuthority} once our team has checked it.`
         : `Updated. ${listing!.domain} will show its Ahrefs Domain Rating once our team has checked it.`
+    )}`
+  );
+}
+
+/**
+ * Let a publisher correct the monthly traffic they entered.
+ *
+ * Traffic used to come from Ahrefs and could not be wrong for long. It is a
+ * publisher-supplied claim now, which puts it in exactly the same class as DA:
+ * we cannot verify it, so a change does not go straight to buyers. The site
+ * returns to "pending" and an admin sees the new number before it goes back on
+ * sale. A site held on a pricing conflict keeps that status, for the same
+ * reason as in changeAuthorityAction - sending it to "pending" would let it
+ * slip past the conflicts queue.
+ */
+export async function changeTrafficAction(formData: FormData) {
+  const user = await requireRole("publisher");
+  const id = parseInt(String(formData.get("id") || "0")) || 0;
+  const traffic = parseTrafficInput(formData.get("monthlyTraffic"));
+
+  // Scoped to this publisher so an id from another account cannot be edited by
+  // posting the form by hand.
+  const listing = await prisma.listing.findFirst({ where: { id, publisherId: user.id } });
+  if (!listing) redirect(`/my-listings?error=${q("That website was not found.")}`);
+
+  if (traffic === null) {
+    redirect(`/my-listings?error=${q("Enter monthly traffic as a number, for example 12000.")}`);
+  }
+  if (traffic === listing!.monthlyTraffic) {
+    redirect(`/my-listings?success=${q("No change - that is already the traffic on this website.")}`);
+  }
+
+  // Only a site that is already live in front of buyers goes back for review.
+  // A site still waiting on approval is being finished, not revised, so the
+  // publisher can correct it freely - and a conflict stays a conflict, or the
+  // edit would let it slip past the conflicts queue.
+  //
+  // The test is the listing's status, deliberately not "was the old traffic 0".
+  // 0 does not mean "never entered": a site could be approved at 0 and then
+  // quietly edited to 900,000, which is exactly the revision review exists for.
+  const wasLive = listing!.status === "approved";
+  await prisma.listing.update({
+    where: { id: listing!.id },
+    data: {
+      monthlyTraffic: traffic!,
+      status: wasLive ? "pending" : listing!.status,
+    },
+  });
+
+  revalidatePath("/my-listings");
+  revalidatePath("/marketplace");
+  redirect(
+    `/my-listings?success=${q(
+      wasLive
+        ? `Updated. ${listing!.domain} will show ${traffic!.toLocaleString("en-US")} monthly traffic once our team has checked it.`
+        : `Updated. ${listing!.domain} is set to ${traffic!.toLocaleString("en-US")} monthly traffic.`
     )}`
   );
 }

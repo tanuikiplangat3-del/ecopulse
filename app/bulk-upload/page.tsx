@@ -19,8 +19,9 @@ export default async function BulkUploadPage({
       <h1 className="h2 mb-1">Upload your websites</h1>
       <p className="muted mb-6">
         Upload a CSV or Excel file and each row becomes a website, exactly as if you added
-        it one by one. You can upload up to 1,000 websites in a single file. Domain Rating
-        and monthly traffic are pulled from Ahrefs and appear shortly after the upload.
+        it one by one. You can upload up to 1,000 websites in a single file. Domain Rating is
+        pulled from Ahrefs and appears shortly after the upload. Monthly traffic must be in
+        the sheet &mdash; we do not fetch it.
       </p>
       <Flash searchParams={searchParams} />
 
@@ -30,17 +31,23 @@ export default async function BulkUploadPage({
         <div className="overflow-x-auto">
           <table className="table-wt">
             <thead>
-              <tr><th>site name</th><th>url</th><th>price</th><th>country</th><th>language</th><th>niche</th><th>da</th></tr>
+              <tr><th>site name</th><th>url</th><th>price</th><th>country</th><th>language</th><th>niche</th><th>traffic</th><th>da</th></tr>
             </thead>
             <tbody>
               <tr>
-                <td>Kone Media</td><td>konemedia.co.ke</td><td>150</td><td>Kenya</td><td>English</td><td>Business, Finance</td><td>45</td>
+                <td>Kone Media</td><td>konemedia.co.ke</td><td>150</td><td>Kenya</td><td>English</td><td>Business, Finance</td><td>12000</td><td>45</td>
               </tr>
             </tbody>
           </table>
         </div>
         <p className="muted mt-3 text-xs">
           For multiple niches on one site, separate them with commas, or write General.
+        </p>
+        <p className="muted mt-2 text-xs">
+          <strong className="text-white">Fill in the traffic column.</strong> It is your
+          site&rsquo;s monthly organic visits, and nothing fills it in later &mdash; a row
+          without it is listed at 0 traffic until you edit the site on Websites. Plain
+          numbers, <em>12,000</em>, <em>12k</em> and <em>1.2M</em> all read correctly.
         </p>
         <p className="muted mt-2 text-xs">
           <strong className="text-white">The da column is optional.</strong> Leave it blank and

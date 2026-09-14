@@ -12,10 +12,10 @@
  * That makes DA a *claim*, not a measurement. Two consequences run through this
  * file and everything that uses it:
  *
- *   1. We still fetch and store the real Ahrefs DR for DA sites. It costs
- *      nothing - DR and monthly traffic come back in the same Ahrefs call, and
- *      we need traffic for every site regardless - and it lets an admin spot a
- *      site claiming DA 70 that Ahrefs rates DR 2.
+ *   1. We still fetch and store the real Ahrefs DR for DA sites, because it
+ *      lets an admin spot a site claiming DA 70 that Ahrefs rates DR 2.
+ *      (Monthly traffic is no longer part of that call - it is entered by the
+ *      publisher. See lib/traffic.ts.)
  *   2. Changing the claim after approval sends the site back to review. A
  *      number nobody can verify must not be editable silently once live.
  *

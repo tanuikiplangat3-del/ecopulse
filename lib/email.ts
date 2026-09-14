@@ -445,3 +445,66 @@ export function sendListingConflictDecision(input: {
     )
   );
 }
+
+/**
+ * An order was cancelled after it was funded - by the publisher rejecting the
+ * guest post, by an admin, or by the turnaround clock running out.
+ *
+ * All three go out to the buyer, the publisher and the admin desk, because all
+ * three parties were expecting a link to appear. The buyer's mail leads with
+ * the refund: that is the only thing they need to act on.
+ */
+export async function sendOrderCancelledEmails(input: {
+  buyerEmail?: string | null;
+  publisherEmail?: string | null;
+  domain: string;
+  orderId: number;
+  refundedCents: number;
+  by: string;
+  reason: string;
+}) {
+  const { buyerEmail, publisherEmail, domain, orderId, refundedCents, by, reason } = input;
+  const who =
+    by === "publisher" ? "The publisher rejected this guest post"
+    : by === "admin" ? "Our team cancelled this order"
+    : by === "system" ? "The turnaround time ran out"
+    : "This order was cancelled";
+
+  if (buyerEmail) {
+    await send(
+      buyerEmail,
+      `Order #${orderId} cancelled - ${money(refundedCents)} back in your balance`,
+      wrap(
+        "Your order was cancelled",
+        `<p>${who}, so order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong>
+            will not go ahead.</p>
+         <p><strong>${money(refundedCents)}</strong> has been returned to your account balance and is
+            ready to spend on another placement right away.</p>
+         <p><strong>Reason given:</strong> ${esc(reason)}</p>`
+      )
+    );
+  }
+  if (publisherEmail) {
+    await send(
+      publisherEmail,
+      `Order #${orderId} on ${domain} was cancelled`,
+      wrap(
+        "An order was cancelled",
+        `<p>Order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong> has been cancelled
+            and the buyer refunded. There is nothing more to do on it.</p>
+         <p><strong>Reason given:</strong> ${esc(reason)}</p>`
+      )
+    );
+  }
+  await send(
+    ADMIN_NOTIFY,
+    `Order #${orderId} cancelled by ${by} (${domain})`,
+    wrap(
+      "Order cancelled",
+      `<p>Order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong> was cancelled by
+          <strong>${esc(by)}</strong>.</p>
+       <p>Refunded to the buyer's balance: <strong>${money(refundedCents)}</strong>.</p>
+       <p><strong>Reason:</strong> ${esc(reason)}</p>`
+    )
+  );
+}
