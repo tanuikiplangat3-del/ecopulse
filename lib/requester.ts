@@ -9,7 +9,15 @@
 // itself, or the discount would never expire.
 
 import { prisma } from "@/lib/prisma";
-import { MARKUP_REQUESTED, REQUESTER_ORDER_LIMIT } from "@/lib/money";
+import { MARKUP_INVITED, MARKUP_REQUESTED, REQUESTER_ORDER_LIMIT } from "@/lib/money";
+
+/**
+ * The two models that give one buyer a reduced rate: a site we listed from
+ * their request, and a site listed by a publisher who joined through their
+ * link. The allowance works identically on both - REQUESTER_ORDER_LIMIT orders
+ * per listing - so every check here asks for either.
+ */
+const REDUCED_RATE_MODELS = [MARKUP_REQUESTED, MARKUP_INVITED];
 
 export type RequesterListing = {
   id: number;
@@ -32,7 +40,7 @@ export async function requesterRateListingIds(
   if (!viewerId) return allowed;
 
   const mine = listings
-    .filter((l) => l.markupModel === MARKUP_REQUESTED && l.requestedById === viewerId)
+    .filter((l) => REDUCED_RATE_MODELS.includes(l.markupModel || "") && l.requestedById === viewerId)
     .map((l) => l.id);
   if (mine.length === 0) return allowed;
 
@@ -69,7 +77,7 @@ export async function requesterOrdersLeft(
   listing: RequesterListing
 ): Promise<number> {
   if (!viewerId) return 0;
-  if (listing.markupModel !== MARKUP_REQUESTED || listing.requestedById !== viewerId) return 0;
+  if (!REDUCED_RATE_MODELS.includes(listing.markupModel || "") || listing.requestedById !== viewerId) return 0;
   const usedCount = await prisma.order.count({
     where: { listingId: listing.id, buyerId: viewerId, status: COUNTS_TOWARDS_LIMIT },
   });

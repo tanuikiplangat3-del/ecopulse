@@ -87,6 +87,9 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
                     {l.markupModel === "requested" && (
                       <span className="badge badge-yellow ml-2">requested</span>
                     )}
+                    {l.markupModel === "invited" && (
+                      <span className="badge badge-blue ml-2">buyer&rsquo;s publisher</span>
+                    )}
                   </div>
                 </td>
                 <td className="muted">{l.publisher.name}</td>

@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { Flash, StatusBadge } from "@/components/ui";
-import { money, buyerPrice, listingBaseCents, MARKUP_REQUESTED } from "@/lib/money";
-import { approveSiteRequestAction, rejectSiteRequestAction } from "@/app/actions/site-requests";
+import { money, buyerPrice, listingBaseCents, MARKUP_INVITED, MARKUP_REQUESTED } from "@/lib/money";
+import { approveSiteRequestAction, rejectSiteRequestAction, createPublisherLinkAction } from "@/app/actions/site-requests";
+import { appUrl } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Site requests" };
@@ -25,12 +26,15 @@ export default async function AdminSiteRequests({
   const buyers = await prisma.user.findMany({ where: { id: { in: buyerIds } } });
   const buyerById = new Map<number, any>(buyers.map((b: any) => [b.id, b]));
   const pending = requests.filter((r: any) => r.status === "pending").length;
+  const base = appUrl();
 
   return (
     <div>
       <h1 className="h2 mb-1">Site requests</h1>
       <p className="muted mb-6">
-        Publishers that buyers negotiated themselves. Approving lists the site immediately.
+        Publishers that buyers negotiated themselves. Generate a sign-up link and the buyer
+        forwards it to their publisher, who then lists the site on their own account and is
+        paid like any other publisher.
         {pending > 0 ? ` ${pending} awaiting review.` : " Nothing awaiting review."}
       </p>
       <Flash searchParams={searchParams} />
@@ -42,11 +46,27 @@ export default async function AdminSiteRequests({
           {requests.map((r: any) => {
             const buyer = buyerById.get(r.buyerId);
             const base = listingBaseCents(r.negotiatedCents, r.vatPercent);
-            const requesterPays = buyerPrice(r.negotiatedCents, MARKUP_REQUESTED, {
+            // Priced as an invited-publisher listing, which is what the link
+            // produces: the tiered margin for everyone, halved for this buyer
+            // on their first 3 orders per site. The publisher sets their own
+            // price when they list, so this is an estimate from the price the
+            // buyer told us they negotiated.
+            const requesterPays = buyerPrice(r.negotiatedCents, MARKUP_INVITED, {
               vatPercent: r.vatPercent,
               requesterRate: true,
             });
-            const othersPay = buyerPrice(r.negotiatedCents, MARKUP_REQUESTED, { vatPercent: r.vatPercent });
+            const othersPay = buyerPrice(r.negotiatedCents, MARKUP_INVITED, { vatPercent: r.vatPercent });
+            // "List it myself instead" produces a MARKUP_REQUESTED listing, which
+            // carries the $25 floor because we pay that publisher by hand. On a
+            // cheap site that is a different number entirely - and quoting the
+            // link price to a buyer who then gets the fallback is how a promise
+            // gets broken.
+            const fbRequester = buyerPrice(r.negotiatedCents, MARKUP_REQUESTED, {
+              vatPercent: r.vatPercent,
+              requesterRate: true,
+            });
+            const fbOthers = buyerPrice(r.negotiatedCents, MARKUP_REQUESTED, { vatPercent: r.vatPercent });
+            const fallbackDiffers = fbRequester !== requesterPays || fbOthers !== othersPay;
             return (
               <div key={r.id} className="card">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -77,7 +97,7 @@ export default async function AdminSiteRequests({
                     <p className="text-lg font-bold">{r.vatApplies ? money(base - r.negotiatedCents) : "—"}</p>
                   </div>
                   <div>
-                    <p className="muted text-xs">This buyer pays (first 3 orders)</p>
+                    <p className="muted text-xs">This buyer pays (first 3 orders per site)</p>
                     <p className="text-lg font-bold text-wt-green">{money(requesterPays)}</p>
                   </div>
                   <div>
@@ -85,6 +105,16 @@ export default async function AdminSiteRequests({
                     <p className="text-lg font-bold">{money(othersPay)}</p>
                   </div>
                 </div>
+
+                {fallbackDiffers && (
+                  <p className="muted mb-4 text-xs">
+                    Those are the prices if the publisher signs up through the link. If you
+                    list it yourself instead, we pay that publisher by hand and the $25
+                    minimum applies, so this buyer would pay{" "}
+                    <strong className="text-white">{money(fbRequester)}</strong> and other
+                    buyers <strong className="text-white">{money(fbOthers)}</strong>.
+                  </p>
+                )}
 
                 <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
                   <p><span className="muted">Publisher contact:</span> {r.publisherName || "—"}</p>
@@ -101,11 +131,30 @@ export default async function AdminSiteRequests({
                   <p className="mb-4 rounded-md border border-wt-border bg-white/5 p-3 text-sm text-white/80">{r.notes}</p>
                 )}
 
-                {r.status === "pending" ? (
+                {r.status === "invited" && r.inviteToken && (
+                  <div className="mb-4 rounded-md border border-wt-green/40 bg-wt-green/10 p-3">
+                    <p className="text-sm font-semibold">Publisher sign-up link (sent to {buyer?.email || "the buyer"})</p>
+                    <p className="mt-1 break-all font-mono text-xs text-white/80">
+                      {base}/accept-invite?token={r.inviteToken}
+                    </p>
+                    <p className="muted mt-2 text-xs">
+                      Works once, expires 30 days after it was created. Generating a new link
+                      cancels this one.
+                    </p>
+                  </div>
+                )}
+
+                {["pending", "invited"].includes(r.status) ? (
                   <div className="flex flex-wrap items-end gap-3">
+                    <form action={createPublisherLinkAction}>
+                      <input type="hidden" name="id" value={r.id} />
+                      <button className="btn-primary btn-sm" type="submit">
+                        {r.status === "invited" ? "Generate a new link" : "Generate publisher link"}
+                      </button>
+                    </form>
                     <form action={approveSiteRequestAction}>
                       <input type="hidden" name="id" value={r.id} />
-                      <button className="btn-primary btn-sm" type="submit">Approve and list</button>
+                      <button className="btn-ghost btn-sm" type="submit">List it myself instead</button>
                     </form>
                     <form action={rejectSiteRequestAction} className="flex flex-1 items-end gap-2">
                       <input type="hidden" name="id" value={r.id} />
@@ -118,7 +167,9 @@ export default async function AdminSiteRequests({
                 ) : (
                   <p className="muted text-sm">
                     {r.status === "approved"
-                      ? `Listed as listing #${r.listingId}.`
+                      ? r.listingId
+                        ? `Listed as listing #${r.listingId}.`
+                        : "The publisher signed up through the link and can now list their sites."
                       : `Rejected${r.adminNote ? `: ${r.adminNote}` : "."}`}
                   </p>
                 )}

@@ -508,3 +508,36 @@ export async function sendOrderCancelledEmails(input: {
     )
   );
 }
+
+/**
+ * The buyer gets the publisher sign-up link to forward on.
+ *
+ * It goes to the BUYER, not to the publisher directly: the buyer is the one
+ * with the relationship, and a cold link from an address the publisher has
+ * never seen is a link nobody clicks.
+ */
+export function sendPublisherLinkToBuyer(input: {
+  buyerEmail: string;
+  buyerName: string;
+  domain: string;
+  publisherName?: string | null;
+  link: string;
+}) {
+  const { buyerEmail, buyerName, domain, publisherName, link } = input;
+  const who = publisherName ? esc(publisherName) : "your publisher";
+  return send(
+    buyerEmail,
+    `Your sign-up link for ${domain}`,
+    wrap(
+      "Send this link to your publisher",
+      `<p>Hi ${esc(buyerName)},</p>
+       <p>We have approved <strong>${esc(domain)}</strong>. Please send the link below to
+          ${who} &mdash; it sets up their publisher account so they can list the site and be
+          paid directly.</p>
+       <p><a href="${link}">${link}</a></p>
+       <p>Once they are set up, <strong>you pay your negotiated rate on your first 3 orders on
+          each site they list</strong>. Other buyers pay our standard rate.</p>
+       <p>The link works once and expires in 30 days. Tell us if you need a fresh one.</p>`
+    )
+  );
+}

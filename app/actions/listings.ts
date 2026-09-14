@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-import { centsFromUsd, money, MARKUP_TIERED } from "@/lib/money";
-import { checkDuplicate, liveDomains, STATUS_CONFLICT } from "@/lib/duplicates";
+import { centsFromUsd, money, MARKUP_TIERED, MARKUP_INVITED } from "@/lib/money";
+import { checkDuplicate, liveDomains, normalizeDomain, STATUS_CONFLICT } from "@/lib/duplicates";
 import { normalizeCountry } from "@/lib/data";
 import { fetchDomainRating } from "@/lib/ahrefs";
 import { parseTrafficCell, parseTrafficInput } from "@/lib/traffic";
@@ -29,8 +29,10 @@ async function makeListing(publisherId: number, data: {
   // Which authority number this site displays. Omitted means DR, which is what
   // every site created before this feature used.
   authorityType?: string; domainAuthority?: number;
-}, opts: { skipAhrefs?: boolean; status?: string } = {}) {
-  const domain = data.domain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+}, opts: { skipAhrefs?: boolean; status?: string; invitedByBuyerId?: number | null } = {}) {
+  // Canonical form, always. Storing "Example.com" or "www.example.com" would
+  // create a second live copy of a domain we already carry.
+  const domain = normalizeDomain(data.domain);
   const url = (data.url || `https://${domain}`).trim();
   // Auto-fetch DR from Ahrefs (fails soft to 0). This runs even when the site
   // will display DA, because admins compare the claim against the real DR when
@@ -56,7 +58,21 @@ async function makeListing(publisherId: number, data: {
       authorityType: authority.authorityType,
       domainAuthority: authority.domainAuthority,
       authorityScore: authorityScoreFor(authority),
-      markupModel: MARKUP_TIERED, // new sites use tiered pricing; older ones keep +$30
+      // A publisher who joined through a buyer's link prices at that buyer's
+      // negotiated rate: half margin for the buyer's first 3 orders on THIS
+      // site, standard tiered margin for everyone else and for that buyer
+      // afterwards. Everyone else's sites are plain tiered.
+      //
+      // A duplicate domain is the exception. opts.status is the conflict status
+      // in that case, and the reduced rate is deliberately withheld: otherwise a
+      // buyer could send a link to a publisher we already carry, get a slightly
+      // lower price agreed, and permanently cut their own cost on inventory we
+      // already had - while the cheapest-wins rule archived our own listing.
+      // Same guard as approveSiteRequestAction. Cosmas confirmed 14 Sep 2026
+      // that a duplicate still goes to Conflicts exactly as before.
+      ...(opts.invitedByBuyerId && opts.status !== STATUS_CONFLICT
+        ? { markupModel: MARKUP_INVITED, requestedById: opts.invitedByBuyerId }
+        : { markupModel: MARKUP_TIERED }),
       // Only mark DR as fetched when Ahrefs actually answered, so the weekly
       // refresh picks it up straight away if it did not.
       metricsUpdatedAt: metrics.ok ? new Date() : null,
@@ -90,7 +106,11 @@ export async function createListingAction(formData: FormData) {
   const chosenAuthority = authorityTypeOf(String(formData.get("authorityType") || ""));
   const daValue = parseDaInput(formData.get("domainAuthority"));
 
-  if (!domain) redirect(`/new-listing?error=${q("Please enter your website domain.")}${first ? "&first=1" : ""}`);
+  // Checked on the canonical form: "https://" and "www." on their own reduce to
+  // nothing, and a listing with an empty domain must never be created.
+  if (!domain || !normalizeDomain(domain)) {
+    redirect(`/new-listing?error=${q("Enter your website domain, for example yoursite.co.ke.")}${first ? "&first=1" : ""}`);
+  }
   if (!country) redirect(`/new-listing?error=${q("Please choose a country.")}${first ? "&first=1" : ""}`);
   if (!priceUsd || priceUsd <= 0) redirect(`/new-listing?error=${q("Enter a valid price in USD.")}${first ? "&first=1" : ""}`);
   if (traffic === null) {
@@ -102,8 +122,11 @@ export async function createListingAction(formData: FormData) {
     redirect(`/new-listing?error=${q("Enter your Domain Authority as a number between 1 and 100, or choose Domain Rating instead.")}${first ? "&first=1" : ""}`);
   }
 
-  const cleanDomain = domain.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/.*$/, "");
+  const cleanDomain = normalizeDomain(domain);
   const dupe = await checkDuplicate(cleanDomain);
+  // Reloaded rather than taken from the session, so an account that was
+  // attributed to a buyer after signing in still prices correctly.
+  const me = await prisma.user.findUnique({ where: { id: user.id }, select: { invitedByBuyerId: true } });
 
   await makeListing(user.id, {
     domain,
@@ -124,6 +147,7 @@ export async function createListingAction(formData: FormData) {
     // or quietly taking anyone down. An admin compares the two prices and
     // decides, on Admin -> Conflicts.
     status: dupe.exists ? STATUS_CONFLICT : undefined,
+    invitedByBuyerId: me?.invitedByBuyerId ?? null,
   });
 
   revalidatePath("/my-listings");
@@ -138,6 +162,14 @@ export async function createListingAction(formData: FormData) {
 export async function bulkUploadAction(formData: FormData) {
   const user = await requireRole("publisher");
   const first = String(formData.get("first") || "") === "1";
+  // Publishers who joined through a buyer's link price at that buyer's
+  // negotiated rate - see makeListing. Reloaded rather than read off the
+  // session, for the same reason.
+  const me = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { invitedByBuyerId: true },
+  });
+  const invitedBy = me?.invitedByBuyerId ?? null;
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) redirect(`/bulk-upload?error=${q("Please choose a spreadsheet to upload.")}${first ? "&first=1" : ""}`);
 
@@ -208,7 +240,7 @@ export async function bulkUploadAction(formData: FormData) {
       skipped++;
       continue;
     }
-    const domain = raw.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/.*$/, "");
+    const domain = normalizeDomain(raw);
     if (!domain) {
       skipped++;
       continue;
@@ -234,7 +266,11 @@ export async function bulkUploadAction(formData: FormData) {
       authorityType: da !== null ? AUTHORITY_DA : undefined,
       domainAuthority: da || 0,
       authorityScore: da || 0,
-      markupModel: MARKUP_TIERED,
+      // Provisional. Rows that turn out to be duplicates are demoted to plain
+      // tiered pricing below, where the conflict is detected - the reduced rate
+      // is only ever for inventory we did not already carry.
+      markupModel: invitedBy ? MARKUP_INVITED : MARKUP_TIERED,
+      requestedById: invitedBy,
       linkType: "guest_post",
       priceCents: centsFromUsd(price),
       tatDays: 7,
@@ -251,6 +287,7 @@ export async function bulkUploadAction(formData: FormData) {
   // than published. One query for the whole sheet, not one per row. A domain
   // repeated inside the same sheet is also held from the second occurrence on,
   // so an upload cannot quietly list the same site twice.
+  // data[].domain is already canonical - normalizeDomain ran on every row above.
   const alreadyLive = await liveDomains(Array.from(new Set(data.map((r) => r.domain as string))));
   const seenInSheet = new Set<string>();
   let conflicts = 0;
@@ -258,6 +295,11 @@ export async function bulkUploadAction(formData: FormData) {
     const d = row.domain as string;
     if (alreadyLive.has(d) || seenInSheet.has(d)) {
       row.status = STATUS_CONFLICT;
+      // A domain we already carry never earns the reduced rate, however it was
+      // submitted. Same anti-arbitrage rule as the single-site path and as
+      // approveSiteRequestAction.
+      row.markupModel = MARKUP_TIERED;
+      row.requestedById = null;
       conflicts++;
     }
     seenInSheet.add(d);
@@ -293,6 +335,9 @@ export async function bulkUploadAction(formData: FormData) {
     (rows.length > MAX_ROWS ? ` Only the first ${MAX_ROWS} rows were read.` : "") +
     (daRows
       ? ` ${daRows} site(s) had a Domain Authority in the DA column and will display DA instead of DR.`
+      : "") +
+    (invitedBy
+      ? ` These sites are priced at your buyer's negotiated rate, except any held for review below.`
       : "") +
     (missingTraffic
       ? ` ${missingTraffic} row(s) had no readable monthly traffic and were listed at 0 - traffic is no longer fetched automatically, so add it on Websites (a live site goes back to our team for a quick check when you change it).`

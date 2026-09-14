@@ -39,7 +39,9 @@ export default async function MarketplacePage({
   const max = parseFloat(one(searchParams.max));
 
   const where: any = { status: "approved" };
-  if (qStr) where.domain = { contains: qStr };
+  // Domains are stored lower case now, so a case-sensitive contains would make
+  // a buyer typing "Example" match nothing.
+  if (qStr) where.domain = { contains: qStr, mode: "insensitive" };
   if (country) where.country = country;
   // Whole-entry match, not a substring - see nicheWhere() for why that matters.
   // Wrapped in AND so this OR cannot collide with any other OR on the query.
@@ -111,6 +113,16 @@ export default async function MarketplacePage({
       <p className="muted mb-6">Browse vetted sites and acquire your placement.</p>
       <Flash searchParams={searchParams} />
 
+      {access.founderNumber !== null && (
+        <div className="card mb-6 border-wt-green/40 text-center">
+          <p className="text-sm">
+            <span className="font-bold text-wt-green">Founding member #{access.founderNumber}</span>{" "}
+            &mdash; you have full access to every website on the marketplace, with no deposit
+            needed. That is yours for good.
+          </p>
+        </div>
+      )}
+
       {user && (
         <form className="card mb-6 grid gap-4 md:grid-cols-7" method="get">
           <label className="field mb-0 md:col-span-2">
@@ -166,6 +178,8 @@ export default async function MarketplacePage({
               <ListingCard key={r.listing.id ?? i} listing={r.listing} locked={r.locked} requesterRate={r.requesterRate} />
             ))}
           </div>
+
+
 
           {lockedCount > 0 && (
             <div className="card mt-6 text-center">

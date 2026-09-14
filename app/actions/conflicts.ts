@@ -11,6 +11,7 @@ import {
   LIVE_STATUS,
   liveRivalFor,
   pendingConflicts,
+  liveMatching,
 } from "@/lib/duplicates";
 import { emailEnabled, sendListingConflictDecision } from "@/lib/email";
 
@@ -70,7 +71,7 @@ export async function switchToNewListingAction(formData: FormData) {
 
   // Everything currently live on this domain steps aside.
   const replaced = await prisma.listing.updateMany({
-    where: { domain: incoming!.domain, status: LIVE_STATUS },
+    where: liveMatching(incoming!.domain),
     data: { status: STATUS_REPLACED },
   });
   await prisma.listing.update({ where: { id }, data: { status: LIVE_STATUS } });
@@ -125,7 +126,7 @@ export async function resolveAllCheapestAction() {
 
     if (incoming.priceCents < rival.priceCents) {
       await prisma.listing.updateMany({
-        where: { domain: incoming.domain, status: LIVE_STATUS },
+        where: liveMatching(incoming.domain),
         data: { status: STATUS_REPLACED },
       });
       await prisma.listing.update({ where: { id: incoming.id }, data: { status: LIVE_STATUS } });

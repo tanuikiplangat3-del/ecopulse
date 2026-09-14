@@ -18,6 +18,7 @@ import {
 import { ahrefsEnabled } from "@/lib/ahrefs";
 import { refreshDueMetrics, REFRESH_AFTER_DAYS } from "@/lib/metrics";
 import { normalizeCountry } from "@/lib/data";
+import { MARKUP_INVITED, MARKUP_TIERED } from "@/lib/money";
 import { STATUS_ARCHIVED } from "@/lib/duplicates";
 
 const q = (s: string) => encodeURIComponent(s);
@@ -285,10 +286,43 @@ export async function deleteUserAction(formData: FormData) {
   if (id === me.id) redirect(`/admin/users?error=${q("You cannot delete your own account.")}`);
   const target = await prisma.user.findUnique({ where: { id } });
   if (!target) redirect(`/admin/users?error=${q("User not found.")}`);
+
+  // Attribution columns are plain Int columns with no foreign key, so deleting
+  // a buyer would otherwise leave publishers and listings pointing at an id
+  // that no longer exists. A listing stuck on "invited" with a dead
+  // requestedById can never give anyone the reduced rate again, so clean it up
+  // rather than leave inventory in a state nobody can reach.
+  let demoted = 0;
+  if (target!.role === "buyer") {
+    // Any link generated for this buyer that nobody has used yet. Left alone,
+    // a publisher could accept it afterwards and every site they list would be
+    // stamped with an id no buyer can ever match - the exact dead state the
+    // rest of this block exists to prevent.
+    await prisma.invite.deleteMany({ where: { requestedById: id, acceptedAt: null } });
+    await prisma.user.updateMany({ where: { invitedByBuyerId: id }, data: { invitedByBuyerId: null } });
+    const res = await prisma.listing.updateMany({
+      where: { requestedById: id, markupModel: MARKUP_INVITED },
+      data: { markupModel: MARKUP_TIERED, requestedById: null },
+    });
+    demoted = res.count;
+    // Sites we listed ourselves from this buyer's request keep markupModel
+    // "requested" - that flag controls how the publisher is paid and how the
+    // order is confirmed, not just pricing - but lose the dangling buyer id.
+    await prisma.listing.updateMany({
+      where: { requestedById: id },
+      data: { requestedById: null },
+    });
+  }
+
   await prisma.user.delete({ where: { id } });
   revalidatePath("/admin/users");
   revalidatePath("/marketplace");
-  redirect(`/admin/users?success=${q("Deleted " + target!.email + ".")}`);
+  redirect(
+    `/admin/users?success=${q(
+      "Deleted " + target!.email + "." +
+      (demoted ? ` ${demoted} site(s) they had introduced now use standard pricing.` : "")
+    )}`
+  );
 }
 
 /** Approve a publisher request: create an invite and email them the sign-up link. */

@@ -15,6 +15,16 @@ export default async function AcceptInvitePage({
   const invite = token ? await prisma.invite.findUnique({ where: { token } }) : null;
   const valid = invite && !invite.acceptedAt && invite.expiresAt > new Date();
   const isAdminInvite = invite?.role === "admin";
+  // A link generated from a buyer's site request. Naming the buyer is the whole
+  // reason the publisher trusts the link - it arrived forwarded from them.
+  const invitingBuyer =
+    valid && invite!.requestedById
+      ? await prisma.user.findUnique({ where: { id: invite!.requestedById } })
+      : null;
+  const requestedSite =
+    valid && invite!.siteRequestId
+      ? await prisma.siteRequest.findUnique({ where: { id: invite!.siteRequestId } })
+      : null;
 
   return (
     <div className="mx-auto max-w-md">
@@ -27,6 +37,19 @@ export default async function AcceptInvitePage({
           </p>
         ) : (
           <>
+            {invitingBuyer && (
+              <div className="mb-5 rounded-md border border-wt-green/40 bg-wt-green/10 p-3 text-sm">
+                <p>
+                  <strong className="text-wt-green">{invitingBuyer.name}</strong> asked us to set
+                  you up{requestedSite ? ` for ${requestedSite.domain}` : ""}.
+                </p>
+                <p className="muted mt-2 text-xs">
+                  Set your own prices here. You are paid within 72 hours of the buyer confirming
+                  each link is live, straight to the payment details you save in the next step.
+                </p>
+              </div>
+            )}
+
             <p className="muted mb-5">
               {isAdminInvite
                 ? "You have been invited as an admin. Choose a name and password to finish setting up your account."

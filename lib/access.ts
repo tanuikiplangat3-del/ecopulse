@@ -3,6 +3,9 @@
 // Everyone sees the first FREE_PREVIEW_COUNT listings in full. Beyond that the
 // listings are locked until the buyer has deposited UNLOCK_DEPOSIT_CENTS or more.
 //
+// FOUNDING BUYERS are the exception: the first ten buyers ever to register are
+// unlocked permanently without depositing anything. See lib/founders.ts.
+//
 // IMPORTANT: locked listings are redacted on the SERVER, in maskListing() below.
 // A CSS blur on its own is decorative - the real domain would still sit in the
 // page source for anyone who opened developer tools. Locked rows are sent to the
@@ -31,26 +34,39 @@ export type Viewer = {
   signedIn: boolean;
   depositedCents: number;
   shortfallCents: number; // how much more is needed to unlock
+  founderNumber: number | null; // 1..10 for a founding buyer, else null
 };
 
 /** Work out what the current viewer is allowed to see. */
 export async function getViewerAccess(
-  user: { id: number; role: string } | null
+  user: { id: number; role: string; founderNumber?: number | null } | null
 ): Promise<Viewer> {
   // Publishers and admins are never paywalled - they run the marketplace.
   if (user && (user.role === "admin" || user.role === "publisher")) {
-    return { unlocked: true, signedIn: true, depositedCents: 0, shortfallCents: 0 };
+    return { unlocked: true, signedIn: true, depositedCents: 0, shortfallCents: 0, founderNumber: null };
   }
   if (!user) {
-    return { unlocked: false, signedIn: false, depositedCents: 0, shortfallCents: UNLOCK_DEPOSIT_CENTS };
+    return { unlocked: false, signedIn: false, depositedCents: 0, shortfallCents: UNLOCK_DEPOSIT_CENTS, founderNumber: null };
   }
+
+  // Callers that already loaded the whole user pass it straight through; the
+  // rest get one indexed lookup. `undefined` means "not loaded", null means
+  // "loaded, and this buyer is not a founder" - they must not be confused.
+  const founderNumber =
+    user.founderNumber !== undefined
+      ? user.founderNumber
+      : (await prisma.user.findUnique({ where: { id: user.id }, select: { founderNumber: true } }))?.founderNumber ?? null;
+
+  // A founding buyer is unlocked for life, without ever depositing. The deposit
+  // total is still reported, because the wallet pages show it.
   const deposited = await totalDepositedCents(user.id);
-  const unlocked = deposited >= UNLOCK_DEPOSIT_CENTS;
+  const unlocked = founderNumber !== null || deposited >= UNLOCK_DEPOSIT_CENTS;
   return {
     unlocked,
     signedIn: true,
     depositedCents: deposited,
     shortfallCents: unlocked ? 0 : UNLOCK_DEPOSIT_CENTS - deposited,
+    founderNumber,
   };
 }
 

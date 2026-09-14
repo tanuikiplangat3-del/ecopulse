@@ -6,8 +6,9 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole, hashPassword } from "@/lib/auth";
 import { centsFromUsd, MARKUP_REQUESTED, MARKUP_TIERED } from "@/lib/money";
-import { emailEnabled, sendSiteRequestAdmin, sendSiteRequestDecision } from "@/lib/email";
-import { STATUS_CONFLICT } from "@/lib/duplicates";
+import { emailEnabled, sendSiteRequestAdmin, sendSiteRequestDecision, sendPublisherLinkToBuyer } from "@/lib/email";
+import { appUrl } from "@/lib/stripe";
+import { normalizeDomain, STATUS_CONFLICT } from "@/lib/duplicates";
 import { normalizeCountry } from "@/lib/data";
 
 const q = (s: string) => encodeURIComponent(s);
@@ -39,7 +40,7 @@ export async function submitSiteRequestAction(formData: FormData) {
   const payDetails = String(formData.get("payDetails") || "").trim();
   const notes = String(formData.get("notes") || "").trim();
 
-  const domain = rawDomain.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/.*$/, "");
+  const domain = normalizeDomain(rawDomain);
 
   if (!siteName) redirect(`${back}?error=${q("Please enter the publisher's site name.")}`);
   if (!domain) redirect(`${back}?error=${q("Please enter the website domain.")}`);
@@ -97,6 +98,76 @@ export async function submitSiteRequestAction(formData: FormData) {
 }
 
 /**
+ * Generate the publisher sign-up link for a site request.
+ *
+ * This is the normal path now. Instead of us listing the site on a container
+ * account and paying the publisher by hand, the buyer forwards this link to the
+ * publisher they negotiated with. Whoever registers through it gets a real
+ * publisher account, lists their own sites, and is paid like any other
+ * publisher - and every site they list carries this buyer's negotiated rate:
+ * half margin on that buyer's first 3 orders per site, standard margin for
+ * everyone else.
+ *
+ * The link is single-use and expires in 30 days. approveSiteRequestAction is
+ * still there as the fallback for a publisher who will not sign up.
+ */
+export async function createPublisherLinkAction(formData: FormData) {
+  await requireRole("admin");
+  const id = parseInt(String(formData.get("id") || "0"));
+  const req = await prisma.siteRequest.findUnique({ where: { id } });
+  if (!req || !["pending", "invited"].includes(req.status))
+    redirect(`/admin/site-requests?error=${q("That request is not awaiting review.")}`);
+
+  const buyer = await prisma.user.findUnique({ where: { id: req!.buyerId } });
+  if (!buyer) redirect(`/admin/site-requests?error=${q("The buyer who made this request no longer exists.")}`);
+
+  // Generating a second link retires the first, so an old link that was already
+  // forwarded cannot be used later to create a duplicate publisher account.
+  await prisma.invite.deleteMany({ where: { siteRequestId: req!.id, acceptedAt: null } });
+
+  const token = randomBytes(24).toString("hex");
+  await prisma.invite.create({
+    data: {
+      email: req!.publisherEmail || null,
+      token,
+      role: "publisher",
+      requestedById: req!.buyerId,
+      siteRequestId: req!.id,
+      expiresAt: new Date(Date.now() + 30 * 86400_000),
+    },
+  });
+  const link = `${appUrl()}/accept-invite?token=${token}`;
+
+  await prisma.siteRequest.update({
+    where: { id },
+    data: { status: "invited", inviteToken: token },
+  });
+
+  if (emailEnabled()) {
+    try {
+      await sendPublisherLinkToBuyer({
+        buyerEmail: buyer!.email,
+        buyerName: buyer!.name,
+        domain: req!.domain,
+        publisherName: req!.publisherName,
+        link,
+      });
+    } catch (e: any) {
+      // The link exists and is on screen either way - never lose it to a mail
+      // failure.
+      console.error(`[site-requests] could not email the publisher link for #${id}: ${e?.message || e}`);
+    }
+  }
+
+  revalidatePath("/admin/site-requests");
+  redirect(
+    `/admin/site-requests?success=${q(
+      `Publisher link created for ${req!.domain} and emailed to ${buyer!.email}. Copy it from the request below if you want to send it yourself: ${link}`
+    )}`
+  );
+}
+
+/**
  * The placeholder publisher account that buyer-requested sites hang off.
  * These publishers have no login - we hold their contact and payment details on
  * the request itself - but a Listing must belong to a publisher, so they all
@@ -120,13 +191,24 @@ async function externalPublisherId(): Promise<number> {
   return created.id;
 }
 
-/** Admin approves a request -> it becomes a live listing straight away. */
+/**
+ * FALLBACK: list the site ourselves on the container account, the old way.
+ *
+ * Use this only when the publisher will not register through a link - they get
+ * paid by hand, and the buyer confirms publication because there is no
+ * publisher account to do it. createPublisherLinkAction above is the normal
+ * path.
+ */
 export async function approveSiteRequestAction(formData: FormData) {
   await requireRole("admin");
   const id = parseInt(String(formData.get("id") || "0"));
   const req = await prisma.siteRequest.findUnique({ where: { id } });
-  if (!req || req.status !== "pending")
+  if (!req || !["pending", "invited"].includes(req.status))
     redirect(`/admin/site-requests?error=${q("That request is not awaiting review.")}`);
+
+  // Listing it ourselves retires any outstanding link, so the publisher cannot
+  // later register and end up with a second listing for the same domain.
+  await prisma.invite.deleteMany({ where: { siteRequestId: req!.id, acceptedAt: null } });
 
   const publisherId = await externalPublisherId();
 
@@ -138,15 +220,21 @@ export async function approveSiteRequestAction(formData: FormData) {
   // created as an ordinary tiered listing at the negotiated price: everyone,
   // including the requester, pays the standard margin.
   const alreadyListed = await prisma.listing.count({
-    where: { domain: req!.domain, status: "approved" },
+    where: {
+      status: "approved",
+      OR: [
+        { domain: { equals: normalizeDomain(req!.domain), mode: "insensitive" } },
+        { domain: { equals: `www.${normalizeDomain(req!.domain)}`, mode: "insensitive" } },
+      ],
+    },
   });
   const isNewInventory = alreadyListed === 0;
 
   const listing = await prisma.listing.create({
     data: {
       publisherId,
-      domain: req!.domain,
-      url: `https://${req!.domain}`,
+      domain: normalizeDomain(req!.domain),
+      url: `https://${normalizeDomain(req!.domain)}`,
       category: req!.category,
       country: req!.country,
       language: req!.language,
@@ -199,12 +287,15 @@ export async function rejectSiteRequestAction(formData: FormData) {
   const id = parseInt(String(formData.get("id") || "0"));
   const note = String(formData.get("note") || "").trim();
   const req = await prisma.siteRequest.findUnique({ where: { id } });
-  if (!req || req.status !== "pending")
+  if (!req || !["pending", "invited"].includes(req.status))
     redirect(`/admin/site-requests?error=${q("That request is not awaiting review.")}`);
+
+  // Kill any link that was already generated for it.
+  await prisma.invite.deleteMany({ where: { siteRequestId: req!.id, acceptedAt: null } });
 
   await prisma.siteRequest.update({
     where: { id },
-    data: { status: "rejected", adminNote: note || null },
+    data: { status: "rejected", adminNote: note || null, inviteToken: null },
   });
 
   if (emailEnabled()) {

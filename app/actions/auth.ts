@@ -13,6 +13,7 @@ import {
 } from "@/lib/email";
 import { appUrl } from "@/lib/stripe";
 import { passwordProblem } from "@/lib/password";
+import { claimFounderSlot } from "@/lib/founders";
 import { randomBytes, randomInt } from "crypto";
 
 function q(s: string) {
@@ -68,6 +69,11 @@ export async function registerAction(formData: FormData) {
     },
   });
 
+  // The founding slot is awarded at email CONFIRMATION, not here. There are
+  // only ten, they last for life, and they cannot be recovered from a deleted
+  // account - so ten throwaway addresses must not be able to burn the lot
+  // before a single real buyer arrives. See verifyCodeAction below.
+
   // Let the admin desk know a new buyer joined (best-effort).
   await sendBuyerSignupAdmin(name, email);
 
@@ -80,10 +86,14 @@ export async function registerAction(formData: FormData) {
     // Resend yet). Never strand the buyer: activate the account and sign them in.
     await prisma.user.update({ where: { id: user.id }, data: { verified: true } });
     await prisma.emailVerification.deleteMany({ where: { userId: user.id } });
+    // Verified by this route rather than by a code, so award the slot here too.
+    await claimFounderSlot(user.id);
     await createSession(user.id);
     redirect(`/dashboard?success=${q("Welcome! Your account is ready.")}`);
   }
 
+  // Email sending is off entirely, so the account was created verified.
+  await claimFounderSlot(user.id);
   await createSession(user.id);
   redirect("/dashboard");
 }
@@ -142,8 +152,19 @@ export async function verifyCodeAction(formData: FormData) {
 
   await prisma.user.update({ where: { id: user!.id }, data: { verified: true } });
   await prisma.emailVerification.deleteMany({ where: { userId: user!.id } });
+
+  // A confirmed buyer is a real one, so this is where a founding slot is
+  // awarded. Buyers only - an admin or publisher never takes one.
+  const slot = user!.role === "buyer" ? await claimFounderSlot(user!.id) : null;
+
   await createSession(user!.id);
-  redirect(`/dashboard?success=${q("Email confirmed. Welcome to Link Tomorrow!")}`);
+  redirect(
+    `/dashboard?success=${q(
+      slot !== null
+        ? `Email confirmed - and you are founding member #${slot}. The whole marketplace is open to you, with no deposit needed.`
+        : "Email confirmed. Welcome to Link Tomorrow!"
+    )}`
+  );
 }
 
 /** Email a fresh 6-digit code to an account that has not been confirmed yet. */
@@ -157,6 +178,9 @@ export async function resendCodeAction(formData: FormData) {
   }
   if (!emailEnabled()) {
     await prisma.user.update({ where: { id: user!.id }, data: { verified: true } });
+    // Verified here rather than by a code, so this is where the founding slot
+    // is awarded on this path. Every route that flips `verified` must claim.
+    if (user!.role === "buyer") await claimFounderSlot(user!.id);
     redirect(`/login?success=${q("Email sending is off, so your account was activated. Please sign in.")}`);
   }
   await issueVerificationCode(user!.id, user!.email);
@@ -216,6 +240,31 @@ export async function acceptInviteAction(formData: FormData) {
   // The invite decides the role - never the form, which the visitor controls.
   const isAdminInvite = invite!.role === "admin";
   const email = (String(formData.get("email") || "") || invite!.email || "").trim().toLowerCase();
+  // The buyer who gets the discount may not accept their own link with the
+  // address we already know them by.
+  //
+  // Be clear about how far this goes: it is a guard rail, NOT a real defence.
+  // The link is emailed to the buyer, so nothing stops them registering through
+  // it with a second address and holding a publisher account whose every
+  // listing carries their own buyer id. What limits the damage is that the
+  // reduced rate never applies to a domain we already carry, that they would
+  // have to actually own and deliver on the sites, and that Admin -> Users
+  // shows "Brought in by" against every publisher who arrived through a link.
+  // A watertight version needs the admin to confirm the publisher account, and
+  // is not built.
+  if (invite!.requestedById) {
+    const inviter = await prisma.user.findUnique({
+      where: { id: invite!.requestedById },
+      select: { email: true },
+    });
+    if (inviter && inviter.email.trim().toLowerCase() === email) {
+      redirect(
+        `/accept-invite?token=${q(token)}&error=${q(
+          "This link is for the publisher you negotiated with, and has to be set up with their own email address - not yours."
+        )}`
+      );
+    }
+  }
   if (!name) redirect(`/accept-invite?token=${q(token)}&error=${q("Please enter your name.")}`);
   if (!isAdminInvite && !agreedTuesday)
     redirect(`/accept-invite?token=${q(token)}&error=${q("You must agree to the payment terms to be listed.")}`);
@@ -239,9 +288,36 @@ export async function acceptInviteAction(formData: FormData) {
       role: isAdminInvite ? "admin" : "publisher",
       verified: true,
       tuesdayAgreed: !isAdminInvite,
+      // A link generated from a buyer's site request carries that buyer. From
+      // here on, every site this publisher lists is priced at the buyer's
+      // negotiated rate for that buyer - see makeListing in actions/listings.ts.
+      // An admin invite never carries one.
+      invitedByBuyerId: isAdminInvite ? null : invite!.requestedById,
     },
   });
-  await prisma.invite.update({ where: { token }, data: { acceptedAt: new Date() } });
+
+  // Single-use, and the guard above already refused an accepted invite. Claimed
+  // with an updateMany on acceptedAt still being null so two people opening the
+  // same link at once cannot both register against it.
+  const claimed = await prisma.invite.updateMany({
+    where: { token, acceptedAt: null },
+    data: { acceptedAt: new Date() },
+  });
+  if (claimed.count === 0) {
+    // Someone beat them to it in the last instant. Delete the half-made account
+    // rather than leaving a publisher who is attributed to nobody.
+    await prisma.user.delete({ where: { id: user.id } });
+    redirect(`/accept-invite?token=${q(token)}&error=${q("This invite has just been used by someone else. Please ask for a new link.")}`);
+  }
+
+  // Mark the originating site request as fulfilled, so the admin page shows the
+  // publisher actually turned up rather than leaving it sitting on "invited".
+  if (invite!.siteRequestId) {
+    await prisma.siteRequest.updateMany({
+      where: { id: invite!.siteRequestId, status: "invited" },
+      data: { status: "approved" },
+    });
+  }
 
   if (emailEnabled()) {
     if (isAdminInvite) {

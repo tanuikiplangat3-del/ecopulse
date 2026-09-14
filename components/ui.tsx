@@ -16,12 +16,15 @@ export function StatusBadge({ status }: { status: string }) {
     replaced: "badge-muted",
     archived: "badge-muted",
     conflict: "badge-yellow",
+    invited: "badge-blue",
   };
   const label =
     status === "replaced"
       ? "replaced (cheaper listed)"
       : status === "archived"
         ? "archived (has orders)"
+        : status === "invited"
+          ? "link sent to buyer"
         : status === "conflict"
           ? "conflict - awaiting review"
           : status.replace(/_/g, " ");

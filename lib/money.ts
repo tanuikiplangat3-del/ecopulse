@@ -39,6 +39,13 @@ export const MIN_TOPUP_CENTS = UNLOCK_DEPOSIT_CENTS;
 /** Free listings every visitor can see before the paywall applies. */
 export const FREE_PREVIEW_COUNT = 10;
 
+/**
+ * Founding buyers. The first FOUNDER_BUYER_LIMIT buyers to register see the
+ * entire marketplace with no deposit at all, permanently. Once the slots are
+ * gone they are gone - buyer number 11 onwards gets the ordinary $50 unlock.
+ */
+export const FOUNDER_BUYER_LIMIT = 10;
+
 /* ---------------------------------------------------------------------------
  * Buyer pricing: a markup on the publisher's price that varies by price band.
  *
@@ -75,6 +82,17 @@ export const LEGACY_MARKUP_CENTS = 3000; // $30
 export const MARKUP_TIERED = "tiered";
 export const MARKUP_FLAT30 = "flat30";
 export const MARKUP_REQUESTED = "requested";
+/**
+ * A site listed by a publisher who joined through a buyer's link.
+ *
+ * This is DELIBERATELY not MARKUP_REQUESTED, even though both give one buyer a
+ * reduced rate. "requested" means something else entirely across the codebase -
+ * that the publisher has no account here - and it switches off the publisher's
+ * delivery screens, the turnaround countdown and the auto-cancel sweep, and
+ * hands the buyer a self-confirm form. These publishers are fully registered
+ * and deliver like anybody else, so they get their own model.
+ */
+export const MARKUP_INVITED = "invited";
 
 /* ---------------------------------------------------------------------------
  * Buyer-requested sites
@@ -89,9 +107,17 @@ export const MARKUP_REQUESTED = "requested";
  * The discount runs out after REQUESTER_ORDER_LIMIT orders on that listing;
  * after that they pay the standard rate like anyone else.
  *
- * MIN_PLATFORM_FEE_CENTS applies to requested sites only. Their publishers have
- * no account here, so every payout is a manual PayPal or bank transfer - on a
- * cheap site the transfer fee alone can exceed the margin.
+ * MIN_PLATFORM_FEE_CENTS applies to MARKUP_REQUESTED sites only. Their
+ * publishers have no account here, so every payout is a manual PayPal or bank
+ * transfer - on a cheap site the transfer fee alone can exceed the margin.
+ *
+ * It does NOT apply to MARKUP_INVITED. Those publishers are paid automatically
+ * like any other, so the manual-transfer cost the floor covers does not exist -
+ * and applying it there would break the rule outright: on a $50 site the floor
+ * swallows the whole discount (requester and everyone else both pay $75.00) and
+ * makes an invited site DEARER for every buyer than the same site listed
+ * normally ($72.50 tiered). An ordinary buyer must pay exactly the ordinary
+ * margin, which is what Cosmas asked for on 14 Sep 2026.
  * ------------------------------------------------------------------------- */
 
 /** The requester pays this share of the normal margin. */
@@ -120,9 +146,13 @@ export function listingBaseCents(publisherCents: number, vatPercent?: number | n
  * Three rules are live at once:
  *   flat30    - sites listed before tiered pricing: publisher price + $30, for life
  *   tiered    - everything listed since: +45% / +25% by band
- *   requested - a site a buyer negotiated themselves. That buyer pays half the
- *               normal margin for their first few orders; everyone else, and
- *               that buyer afterwards, pays the standard margin.
+ *   requested - a site a buyer negotiated themselves, listed by us on the
+ *               container account. That buyer pays half the normal margin for
+ *               their first few orders; everyone else, and that buyer
+ *               afterwards, pays the standard margin, with a $25 floor.
+ *   invited   - a site listed by a publisher who joined through that buyer's
+ *               link. Identical to tiered for everyone else - no floor - and
+ *               half margin for the inviting buyer on their first few orders.
  *
  * `requesterRate` is NOT simply "is this the requester". The caller must have
  * already checked that they are the requester AND still have orders left at the
@@ -140,6 +170,13 @@ export function buyerPrice(
     const fee = opts?.requesterRate ? Math.round(standardFee * REQUESTER_MARGIN_SHARE) : standardFee;
     // The floor covers the manual payout these sites always need.
     return base + Math.max(fee, MIN_PLATFORM_FEE_CENTS);
+  }
+  if (markupModel === MARKUP_INVITED) {
+    // Exactly the tiered curve, halved for the inviting buyer while their
+    // allowance lasts. No floor: see the note above MIN_PLATFORM_FEE_CENTS.
+    const standardFee = Math.round(base * markupRate(base));
+    const fee = opts?.requesterRate ? Math.round(standardFee * REQUESTER_MARGIN_SHARE) : standardFee;
+    return base + fee;
   }
   if (markupModel === MARKUP_TIERED) {
     return Math.round(base * (1 + markupRate(base)));

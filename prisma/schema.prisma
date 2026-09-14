@@ -33,6 +33,17 @@ model User {
   payCard        String?  // card / other note
   tuesdayAgreed  Boolean  @default(false) // publisher accepted the payout terms
   verified       Boolean  @default(false)
+  // FOUNDING BUYERS. The first FOUNDER_BUYER_LIMIT buyers ever to sign up see
+  // the whole marketplace with no deposit, for life. The slot number (1..10) is
+  // stored rather than worked out from createdAt on the fly, so the group can
+  // never shift when a row is deleted, and @unique is what actually stops two
+  // simultaneous signups claiming the same slot.
+  founderNumber  Int?     @unique
+  // PUBLISHER BROUGHT IN BY A BUYER. Set when a publisher registers through a
+  // link generated from that buyer's site request. Every site this publisher
+  // lists is then priced at the inviting buyer's negotiated rate - half margin
+  // for their first 3 orders on each site. See lib/requester.ts.
+  invitedByBuyerId Int?
   createdAt      DateTime @default(now())
 
   listings  Listing[]
@@ -159,6 +170,12 @@ model Invite {
   role       String    @default("publisher")
   expiresAt  DateTime
   acceptedAt DateTime?
+  // A link generated from a buyer's site request. The buyer sends it to the
+  // publisher they negotiated with; whoever registers through it is attributed
+  // to this buyer, and that buyer gets their negotiated rate on the sites that
+  // publisher lists. Null on an ordinary invite.
+  requestedById Int?
+  siteRequestId Int?
   createdAt  DateTime  @default(now())
 
   @@index([email])
@@ -188,9 +205,14 @@ model SiteRequest {
   payMethod       String   @default("paypal") // paypal | bank | mpesa | other
   payDetails      String?
   notes           String?
-  status          String   @default("pending") // pending | approved | rejected
+  // pending  - awaiting review
+  // invited  - a publisher link was generated and sent to the buyer
+  // approved - listed directly by an admin, without a link
+  // rejected
+  status          String   @default("pending")
   adminNote       String?
   listingId       Int?
+  inviteToken     String?  // the publisher link generated for this request
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

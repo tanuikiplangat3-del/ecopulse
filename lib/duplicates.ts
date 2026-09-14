@@ -15,6 +15,58 @@
 
 import { prisma } from "@/lib/prisma";
 
+/**
+ * The one canonical form of a domain: lower case, no protocol, no "www.", no
+ * path, no trailing dot.
+ *
+ * Every write and every comparison goes through this. Without it the duplicate
+ * guard is trivially bypassed - "Example.com" and "www.example.com" both slip
+ * past a check for "example.com", which publishes a second copy of a site we
+ * already carry AND, for a publisher invited by a buyer, hands that buyer a
+ * fresh 3-order discount allowance on each spelling.
+ */
+export function normalizeDomain(input: string): string {
+  const cleaned = String(input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    // Everything from the first path, query, fragment, credential or whitespace
+    // character onwards. Cutting only on "/" left "example.com?ref=x" as a
+    // separate key from "example.com", which reopened the whole bypass.
+    .replace(/[/?#\s].*$/, "")
+    .replace(/^[^@]*@/, "")
+    .replace(/:\d+$/, "")
+    .replace(/\.+$/, "");
+
+  // Must still look like a hostname. "https://" on its own normalises to the
+  // empty string, and an empty or malformed domain must never reach the
+  // database as a listing.
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(cleaned)) return "";
+  return cleaned;
+}
+
+/**
+ * A `where` fragment matching every live listing for this domain, however it
+ * happens to be spelled in the database.
+ *
+ * Rows created before normalisation may be stored as "Example.com" or
+ * "www.example.com". Every read that asks "what is already live on this
+ * domain?" must use this, not `{ domain }` - otherwise the duplicate guard
+ * parks a newcomer as a conflict and the conflict screen, finding no rival,
+ * happily publishes it alongside the row it was meant to compete with.
+ */
+export function liveMatching(domain: string) {
+  const canonical = normalizeDomain(domain) || String(domain || "").trim().toLowerCase();
+  return {
+    status: LIVE_STATUS,
+    OR: [
+      { domain: { equals: canonical, mode: "insensitive" as const } },
+      { domain: { equals: `www.${canonical}`, mode: "insensitive" as const } },
+    ],
+  };
+}
+
 /** Listing statuses used by duplicate handling. */
 export const STATUS_CONFLICT = "conflict";   // held, waiting for an admin decision
 export const STATUS_REPLACED = "replaced";   // taken down because a cheaper one won
@@ -29,10 +81,15 @@ export type DuplicateCheck = {
   count: number;
 };
 
-/** Is this domain already on the marketplace, and at what price? */
+/**
+ * Is this domain already on the marketplace, and at what price?
+ *
+ * Matched case-insensitively, because rows created before normalisation may be
+ * stored as "Example.com" or "www.example.com".
+ */
 export async function checkDuplicate(domain: string): Promise<DuplicateCheck> {
   const live = await prisma.listing.findMany({
-    where: { domain, status: LIVE_STATUS },
+    where: liveMatching(domain),
     select: { id: true, priceCents: true },
     orderBy: { priceCents: "asc" },
   });
@@ -49,7 +106,7 @@ export async function checkDuplicate(domain: string): Promise<DuplicateCheck> {
  */
 export async function liveRivalFor(domain: string) {
   return prisma.listing.findFirst({
-    where: { domain, status: LIVE_STATUS },
+    where: liveMatching(domain),
     orderBy: [{ priceCents: "asc" }, { createdAt: "asc" }],
     include: { publisher: { select: { id: true, name: true, email: true } } },
   });
@@ -61,11 +118,20 @@ export async function liveRivalFor(domain: string) {
  */
 export async function liveDomains(domains: string[]): Promise<Set<string>> {
   if (domains.length === 0) return new Set();
+  const wanted = new Set(domains.map(normalizeDomain));
+  // Every live domain, then compared in canonical form here. An `in` query
+  // would be case-sensitive and blind to a "www." prefix, which is exactly the
+  // bypass this guard exists to stop. It is one column on a few hundred rows.
   const rows = await prisma.listing.findMany({
-    where: { domain: { in: domains }, status: LIVE_STATUS },
+    where: { status: LIVE_STATUS },
     select: { domain: true },
   });
-  return new Set(rows.map((r) => r.domain));
+  const live = new Set<string>();
+  for (const r of rows) {
+    const canonical = normalizeDomain(r.domain);
+    if (wanted.has(canonical)) live.add(canonical);
+  }
+  return live;
 }
 
 /** Everything currently waiting on an admin decision, newest first. */
@@ -88,7 +154,7 @@ export async function countConflicts(): Promise<number> {
  */
 export async function archiveDearerDuplicates(domain: string): Promise<number> {
   const live = await prisma.listing.findMany({
-    where: { domain, status: LIVE_STATUS },
+    where: liveMatching(domain),
     select: { id: true, priceCents: true, createdAt: true },
     orderBy: [{ priceCents: "asc" }, { createdAt: "asc" }],
   });
