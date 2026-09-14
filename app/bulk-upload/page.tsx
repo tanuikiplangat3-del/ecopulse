@@ -21,7 +21,7 @@ export default async function BulkUploadPage({
         Upload a CSV or Excel file and each row becomes a website, exactly as if you added
         it one by one. You can upload up to 1,000 websites in a single file. Domain Rating is
         pulled from Ahrefs and appears shortly after the upload. Monthly traffic must be in
-        the sheet &mdash; we do not fetch it.
+        the sheet. We do not fetch it.
       </p>
       <Flash searchParams={searchParams} />
 
@@ -45,14 +45,14 @@ export default async function BulkUploadPage({
         </p>
         <p className="muted mt-2 text-xs">
           <strong className="text-white">Fill in the traffic column.</strong> It is your
-          site&rsquo;s monthly organic visits, and nothing fills it in later &mdash; a row
+          site&rsquo;s monthly organic visits, and nothing fills it in later. A row
           without it is listed at 0 traffic until you edit the site on Websites. Plain
           numbers, <em>12,000</em>, <em>12k</em> and <em>1.2M</em> all read correctly.
         </p>
         <p className="muted mt-2 text-xs">
           <strong className="text-white">The da column is optional.</strong> Leave it blank and
           we fill in the site&rsquo;s Domain Rating from Ahrefs automatically. Put a number
-          from 1 to 100 in it and that site shows your Domain Authority instead of DR &mdash;
+          from 1 to 100 in it and that site shows your Domain Authority instead of DR ,
           use it for sites that score better on DA. Anything we cannot read as a number is
           ignored and the site stays on DR.
         </p>

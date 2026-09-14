@@ -167,8 +167,8 @@ export default async function OrderPage({
           <p className="muted text-sm">
             {money(order!.amountCents)} is being held until the link is live, so this order can no
             longer be cancelled from your side. If the publisher cannot run the post they will
-            reject it, and if the turnaround runs out it cancels itself &mdash; either way the
-            money returns to your balance automatically. Need it stopped sooner? Email{" "}
+            reject it, and if the turnaround runs out it cancels itself. Either way the money
+            returns to your balance automatically. Need it stopped sooner? Email{" "}
             <a className="text-wt-green" href="mailto:hello@welcometomorrow.io">hello@welcometomorrow.io</a>.
           </p>
         </div>
@@ -206,8 +206,8 @@ export default async function OrderPage({
               Can&rsquo;t run this guest post? Reject it &rarr;
             </summary>
             <p className="muted mb-4 mt-3 text-sm">
-              Rejecting ends the order and refunds the buyer in full. Please say why &mdash; the
-              buyer is told your reason, and our team sees it too.
+              Rejecting ends the order and refunds the buyer in full. Please say why. The buyer
+              is told your reason, and our team sees it too.
             </p>
             <form action={publisherRejectOrderAction} className="space-y-3">
               <input type="hidden" name="orderId" value={order!.id} />

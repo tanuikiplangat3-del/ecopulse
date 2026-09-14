@@ -102,7 +102,7 @@ export default async function AdminOrders({ searchParams }: { searchParams: { [k
                   <td className="muted">{o.listing.publisher.name}</td>
                   <td>{money(o.amountCents)}</td>
                   <td className="whitespace-nowrap">
-                    {o.dueAt ? <Countdown dueAt={o.dueAt.toISOString()} /> : <span className="muted">—</span>}
+                    {o.dueAt ? <Countdown dueAt={o.dueAt.toISOString()} /> : <span className="muted">,</span>}
                   </td>
                   <td><StatusBadge status={o.status} /></td>
                   <td><Link href={`/orders/${o.id}`} className="text-wt-green whitespace-nowrap">Open →</Link></td>

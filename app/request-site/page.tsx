@@ -1,13 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-import { Flash, StatusBadge } from "@/components/ui";
-import SearchSelect from "@/components/SearchSelect";
-import { NICHES, COUNTRIES, LANGUAGES, LINK_TYPES } from "@/lib/data";
-import { money } from "@/lib/money";
-import { submitSiteRequestAction } from "@/app/actions/site-requests";
+import { Flash } from "@/components/ui";
+import { appUrl } from "@/lib/stripe";
+import { INVITE_DAYS, MAX_OPEN_INVITES } from "@/lib/invites";
+import {
+  createPublisherInviteAction,
+  cancelPublisherInviteAction,
+} from "@/app/actions/publisher-invites";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Request a site" };
+export const metadata = { title: "Invite publisher" };
 
 export default async function RequestSitePage({
   searchParams,
@@ -15,166 +17,153 @@ export default async function RequestSitePage({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const user = await requireRole("buyer");
-  const mine = await prisma.siteRequest.findMany({
-    where: { buyerId: user.id },
+  const base = appUrl();
+  const mine = { requestedById: user.id, siteRequestId: null };
+
+  const invites = await prisma.invite.findMany({
+    where: mine,
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: 30,
   });
+
+  // Counted with the same query the action uses, not from the 30 rows above, so
+  // the number on screen is the number that will actually be enforced.
+  const open = await prisma.invite.count({
+    where: { ...mine, acceptedAt: null, expiresAt: { gt: new Date() } },
+  });
+
+  // Publishers who actually joined through THIS buyer, so an accepted link can
+  // name them. Keyed on the attribution we set at sign-up rather than on the
+  // address the buyer typed, which they do not necessarily end up using.
+  const joined = await prisma.user.findMany({
+    where: { invitedByBuyerId: user.id, role: "publisher" },
+    select: { id: true, name: true, email: true, createdAt: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const joinedByEmail = new Map<string, any>(joined.map((u: any) => [u.email, u]));
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="h2 mb-1">Request a site</h1>
+      <h1 className="h2 mb-1">Invite publisher</h1>
       <p className="muted mb-6">
-        Negotiated directly with a publisher? Send us the details and we&apos;ll add their site to
-        the marketplace. For your first 3 orders on it you pay <strong>half our standard
-        margin</strong> &mdash; every other buyer, and you after that, pays the standard rate.
+        Negotiated a good price? We will reward you with a discounted price to use the platform.
+        Put in your publisher&rsquo;s email and we will make you a sign-up link to send them. They
+        set up their own account, list their sites and get paid directly, and because you brought
+        them in, <strong className="text-white">you pay half our standard margin on your first 3
+        orders on every site they list</strong>. Every other buyer pays the standard rate.
       </p>
       <Flash searchParams={searchParams} />
 
-      <form action={submitSiteRequestAction} className="card">
-        <h2 className="h3 mb-4">The website</h2>
+      <form action={createPublisherInviteAction} className="card">
         <label className="field">
-          <span>Publisher site name</span>
-          <input className="input" name="siteName" placeholder="Kone Media" required />
+          <span>Publisher&rsquo;s email</span>
+          <input
+            className="input"
+            type="email"
+            name="publisherEmail"
+            placeholder="jane@konemedia.co.ke"
+            required
+            autoComplete="off"
+          />
+          <small className="muted">We email the link straight to them, and to you as well.</small>
         </label>
-        <label className="field">
-          <span>Domain</span>
-          <input className="input" name="domain" placeholder="konemedia.co.ke" required />
-        </label>
+
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="field">
-            <span>Price you negotiated (USD)</span>
-            <input className="input" name="price" type="number" min="1" step="0.01" placeholder="150" required />
+          <label className="field mb-0">
+            <span>Their name <span className="muted">(optional)</span></span>
+            <input className="input" name="publisherName" placeholder="Jane Doe" autoComplete="off" />
           </label>
-          <label className="field">
-            <span>Turnaround (days)</span>
-            <input className="input" name="tatDays" type="number" min="1" max="60" defaultValue="7" required />
-          </label>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="field">
-            <span>Country</span>
-            <SearchSelect name="country" options={COUNTRIES} placeholder="Choose" title="Choose a country" allowAny={false} />
-          </div>
-          <div className="field">
-            <span>Language</span>
-            <SearchSelect name="language" options={LANGUAGES} defaultValue="English" title="Choose a language" allowAny={false} />
-          </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="field">
-            <span>Niche</span>
-            <SearchSelect name="category" options={NICHES} defaultValue="General" title="Choose a niche" allowAny={false} />
-          </div>
-          <label className="field">
-            <span>Link type</span>
-            <select className="select" name="linkType" defaultValue="guest_post">
-              {LINK_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+          <label className="field mb-0">
+            <span>Their website <span className="muted">(optional)</span></span>
+            <input className="input" name="site" placeholder="konemedia.co.ke" autoComplete="off" />
           </label>
         </div>
 
-        <h2 className="h3 mb-4 mt-6">Publisher contact</h2>
-        <label className="field">
-          <span>Contact name</span>
-          <input className="input" name="publisherName" placeholder="Jane Doe" />
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="field">
-            <span>Email</span>
-            <input className="input" type="email" name="publisherEmail" placeholder="jane@konemedia.co.ke" />
-          </label>
-          <label className="field">
-            <span>Phone</span>
-            <input className="input" name="publisherPhone" placeholder="+254 7XX XXX XXX" />
-          </label>
-        </div>
-        <p className="muted -mt-2 mb-4 text-xs">Give us at least one of the two so we can reach them.</p>
-
-        <h2 className="h3 mb-4 mt-6">How the publisher gets paid</h2>
-        <label className="field">
-          <span>Payment method</span>
-          <select className="select" name="payMethod" defaultValue="paypal">
-            <option value="paypal">PayPal (preferred)</option>
-            <option value="bank">Bank transfer</option>
-            <option value="mpesa">M-Pesa</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>Payment details</span>
-          <input className="input" name="payDetails" placeholder="PayPal email, bank account or M-Pesa number" required />
-        </label>
-
-        <h2 className="h3 mb-4 mt-6">VAT</h2>
-        <label className="field">
-          <span>Does the publisher charge VAT?</span>
-          <select className="select" name="vatApplies" defaultValue="no">
-            <option value="no">No</option>
-            <option value="yes">Yes</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>VAT percentage (only if yes)</span>
-          <input className="input" name="vatPercent" type="number" min="0" max="100" step="0.01" placeholder="16" />
-          <small className="muted">VAT is added on top of the negotiated price and paid through to the publisher.</small>
-        </label>
-
-        <h2 className="h3 mb-4 mt-6">Terms</h2>
-        <label className="mb-3 flex items-start gap-3 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
-          <input type="checkbox" name="agreed72h" className="mt-1" required />
-          <span>
-            I confirm the publisher has agreed to be paid <strong>within 72 hours</strong> of the buyer
-            confirming the link is live. We cannot list a publisher who does not accept this.
-          </span>
-        </label>
-        <label className="mb-4 flex items-start gap-3 rounded-md border border-wt-border bg-white/5 p-3 text-sm">
-          <input type="checkbox" name="agreedFee" className="mt-1" required />
-          <span>
-            I understand that I pay my negotiated price plus <strong>half the standard platform
-            margin</strong> on my first 3 orders on this site (minimum $25 per order, which covers
-            paying the publisher), and the standard rate after that. If we already list this domain,
-            standard pricing applies from the start.
-          </span>
-        </label>
-
-        <label className="field">
-          <span>Anything else we should know? (optional)</span>
-          <textarea className="textarea" name="notes" placeholder="Link rules, content requirements, who introduced you..." />
-        </label>
-
-        <button className="btn-primary w-full" type="submit">Submit for review</button>
+        <button className="btn-primary mt-5 w-full" type="submit">Create the link</button>
         <p className="muted mt-3 text-center text-xs">
-          Our team reviews every request. You&apos;ll be emailed once it is approved or if we cannot list it.
+          Nothing else needed. The publisher sets their own price, turnaround and payment details
+          when they sign up. Each link works once and expires in {INVITE_DAYS} days.
         </p>
       </form>
 
-      {mine.length > 0 && (
-        <div className="card mt-6 overflow-x-auto">
-          <h2 className="h3 mb-3">Your requests</h2>
-          <table className="table-wt">
-            <thead><tr><th>Website</th><th>Your price</th><th>VAT</th><th>Status</th><th>Sent</th></tr></thead>
-            <tbody>
-              {mine.map((r: any) => (
-                <tr key={r.id}>
-                  <td className="font-semibold">{r.domain}<div className="muted text-xs">{r.siteName}</div></td>
-                  <td>{money(r.negotiatedCents)}</td>
-                  <td className="muted">{r.vatApplies ? `${r.vatPercent}%` : "—"}</td>
-                  <td>
-                    <StatusBadge status={r.status} />
-                    {r.status === "rejected" && r.adminNote && (
-                      <div className="muted mt-1 text-xs">{r.adminNote}</div>
-                    )}
-                  </td>
-                  <td className="muted">{r.createdAt.toISOString().slice(0, 10)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="card mt-6">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="h3">Your links</h2>
+          <span className="muted text-xs">
+            {open} of {MAX_OPEN_INVITES} waiting to be used
+          </span>
         </div>
-      )}
+
+        {invites.length === 0 ? (
+          <p className="muted text-sm">
+            No links yet. Create one above and send it to a publisher you have already agreed terms
+            with.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {invites.map((i: any) => {
+              const who = i.email ? joinedByEmail.get(i.email) : null;
+              const expired = !i.acceptedAt && i.expiresAt <= new Date();
+              const link = `${base}/accept-invite?token=${i.token}`;
+              return (
+                <div key={i.id} className="rounded-md border border-wt-border bg-white/5 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold">{i.email}</p>
+                      <p className="muted text-xs">
+                        Created {i.createdAt.toISOString().slice(0, 10)}
+                        {!i.acceptedAt && !expired && ` · expires ${i.expiresAt.toISOString().slice(0, 10)}`}
+                      </p>
+                    </div>
+                    {i.acceptedAt ? (
+                      <span className="badge badge-green">
+                        {who ? `joined: ${who.name}` : "joined"}
+                      </span>
+                    ) : expired ? (
+                      <span className="badge badge-muted">expired</span>
+                    ) : (
+                      <span className="badge badge-yellow">waiting to sign up</span>
+                    )}
+                  </div>
+
+                  {!i.acceptedAt && !expired && (
+                    <>
+                      <p className="mt-3 break-all rounded-md border border-wt-border bg-black/30 p-2 font-mono text-xs text-white/80">
+                        {link}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <a
+                          className="btn-ghost btn-sm"
+                          href={`mailto:${encodeURIComponent(i.email)}?subject=${encodeURIComponent("Join me on Link Tomorrow")}&body=${encodeURIComponent(`Hi,\n\nPlease use this link to set up your publisher account on Link Tomorrow:\n\n${link}\n\nThanks,\n${user.name}`)}`}
+                        >
+                          Send it again
+                        </a>
+                        <form action={cancelPublisherInviteAction}>
+                          <input type="hidden" name="id" value={i.id} />
+                          <button className="btn-danger btn-sm" type="submit">Cancel link</button>
+                        </form>
+                      </div>
+                    </>
+                  )}
+
+                  {i.acceptedAt && (
+                    <p className="muted mt-2 text-xs">
+                      Your rate applies to every site {who ? who.name : "they"} lists. Half our
+                      standard margin on your first 3 orders on each one.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <p className="muted mt-6 text-center text-sm">
+        Publisher will not sign up themselves? Email{" "}
+        <a className="text-wt-green" href="mailto:hello@welcometomorrow.io">hello@welcometomorrow.io</a>{" "}
+        with the details you agreed and we will list the site for you instead.
+      </p>
     </div>
   );
 }

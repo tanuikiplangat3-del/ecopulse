@@ -33,7 +33,7 @@ export default async function Nav() {
       items.push({ href: "/payout", label: "Payment details" });
     }
     if (u.role === "buyer") {
-      items.push({ href: "/request-site", label: "Request a site" });
+      items.push({ href: "/request-site", label: "Invite publisher" });
       items.push({ href: "/topup", label: `Balance: ${money(u.balanceCents)}` });
     }
     items.push({ href: "/orders", label: "Orders" });

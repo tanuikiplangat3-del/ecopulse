@@ -78,7 +78,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                   <td className="whitespace-nowrap">
                     {o.dueAt && ["funded", "in_progress"].includes(o.status)
                       ? <Countdown dueAt={o.dueAt.toISOString()} />
-                      : <span className="muted">—</span>}
+                      : <span className="muted">,</span>}
                   </td>
                   <td><StatusBadge status={o.status} /></td>
                   <td>

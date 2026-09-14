@@ -29,8 +29,8 @@ export default async function AdminUsers({
       <h1 className="h2 mb-1">Users</h1>
       <p className="muted mb-6">
         Publishers and buyers, kept separate. {founders} of {FOUNDER_BUYER_LIMIT} founding
-        buyer places taken &mdash; founding buyers see the whole marketplace without
-        depositing, for life.
+        buyer places taken. Founding buyers see the whole marketplace without depositing,
+        for life.
       </p>
       <Flash searchParams={searchParams} />
 

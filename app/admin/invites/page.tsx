@@ -7,6 +7,13 @@ import { emailEnabled } from "@/lib/email";
 export default async function AdminInvites({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   await requireRole("admin");
   const invites = await prisma.invite.findMany({ orderBy: { createdAt: "desc" } });
+  // Links a BUYER generated for a publisher they negotiated with. Whoever signs
+  // up through one is attributed to that buyer, so it is worth seeing here.
+  const buyerIds = Array.from(new Set(invites.map((i: any) => i.requestedById).filter(Boolean))) as number[];
+  const buyers = buyerIds.length
+    ? await prisma.user.findMany({ where: { id: { in: buyerIds } }, select: { id: true, name: true } })
+    : [];
+  const buyerById = new Map<number, any>(buyers.map((b: any) => [b.id, b]));
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -47,14 +54,19 @@ export default async function AdminInvites({ searchParams }: { searchParams: { [
 
       <div className="card overflow-x-auto">
         <table className="table-wt">
-          <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Expires</th><th></th></tr></thead>
+          <thead><tr><th>Email</th><th>Role</th><th>For buyer</th><th>Status</th><th>Expires</th><th></th></tr></thead>
           <tbody>
-            {invites.length === 0 && (<tr><td colSpan={5} className="muted">No invites yet.</td></tr>)}
+            {invites.length === 0 && (<tr><td colSpan={6} className="muted">No invites yet.</td></tr>)}
             {invites.map((i) => (
               <tr key={i.id}>
                 <td className="font-semibold">{i.email || <span className="text-white/50">shareable link</span>}</td>
                 <td>
                   <span className={`badge ${i.role === "admin" ? "badge-yellow" : "badge-muted"}`}>{i.role}</span>
+                </td>
+                <td className="muted">
+                  {i.requestedById
+                    ? buyerById.get(i.requestedById)?.name || `buyer #${i.requestedById}`
+                    : ","}
                 </td>
                 <td>
                   {i.acceptedAt ? <span className="badge badge-green">accepted</span>

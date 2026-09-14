@@ -70,8 +70,8 @@ export default async function NewListingPage({
               required
             />
             <span className="muted mt-1 block text-xs">
-              Monthly organic visits. Enter the number yourself &mdash; we no longer pull this
-              from Ahrefs. Enter 0 if the site is brand new.
+              Monthly organic visits. Enter the number yourself. We no longer pull this from
+              Ahrefs. Enter 0 if the site is brand new.
             </span>
           </label>
         </div>

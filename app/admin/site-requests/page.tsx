@@ -80,7 +80,7 @@ export default async function AdminSiteRequests({
                       {r.siteName} · {r.country} · {r.language} · {r.category}
                     </p>
                     <p className="muted text-xs">
-                      Requested by {buyer?.name || "unknown"} ({buyer?.email || "—"}) on{" "}
+                      Requested by {buyer?.name || "unknown"} ({buyer?.email || ","}) on{" "}
                       {r.createdAt.toISOString().slice(0, 10)}
                     </p>
                   </div>
@@ -94,7 +94,7 @@ export default async function AdminSiteRequests({
                   </div>
                   <div>
                     <p className="muted text-xs">VAT {r.vatApplies ? `(${r.vatPercent}%)` : ""}</p>
-                    <p className="text-lg font-bold">{r.vatApplies ? money(base - r.negotiatedCents) : "—"}</p>
+                    <p className="text-lg font-bold">{r.vatApplies ? money(base - r.negotiatedCents) : ","}</p>
                   </div>
                   <div>
                     <p className="muted text-xs">This buyer pays (first 3 orders per site)</p>
@@ -117,12 +117,12 @@ export default async function AdminSiteRequests({
                 )}
 
                 <div className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
-                  <p><span className="muted">Publisher contact:</span> {r.publisherName || "—"}</p>
+                  <p><span className="muted">Publisher contact:</span> {r.publisherName || ","}</p>
                   <p><span className="muted">Turnaround:</span> {r.tatDays} days</p>
-                  <p><span className="muted">Email:</span> {r.publisherEmail || "—"}</p>
-                  <p><span className="muted">Phone:</span> {r.publisherPhone || "—"}</p>
+                  <p><span className="muted">Email:</span> {r.publisherEmail || ","}</p>
+                  <p><span className="muted">Phone:</span> {r.publisherPhone || ","}</p>
                   <p><span className="muted">Pay by:</span> {PAY_LABEL[r.payMethod] || r.payMethod}</p>
-                  <p><span className="muted">Pay to:</span> {r.payDetails || "—"}</p>
+                  <p><span className="muted">Pay to:</span> {r.payDetails || ","}</p>
                   <p><span className="muted">Accepts 72h payment:</span> {r.agreed72h ? "Yes" : "No"}</p>
                   <p><span className="muted">Buyer accepted 5% fee:</span> {r.agreedFee ? "Yes" : "No"}</p>
                 </div>

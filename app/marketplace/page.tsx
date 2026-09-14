@@ -116,9 +116,9 @@ export default async function MarketplacePage({
       {access.founderNumber !== null && (
         <div className="card mb-6 border-wt-green/40 text-center">
           <p className="text-sm">
-            <span className="font-bold text-wt-green">Founding member #{access.founderNumber}</span>{" "}
-            &mdash; you have full access to every website on the marketplace, with no deposit
-            needed. That is yours for good.
+            <span className="font-bold text-wt-green">Founding member #{access.founderNumber}</span>.
+            You have full access to every website on the marketplace, with no deposit needed.
+            That is yours for good.
           </p>
         </div>
       )}

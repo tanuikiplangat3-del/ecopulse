@@ -13,7 +13,16 @@ import { normalizeCountry } from "@/lib/data";
 
 const q = (s: string) => encodeURIComponent(s);
 
-/** A buyer submits a publisher they have negotiated with, for us to review and list. */
+/**
+ * LEGACY: the long "tell us everything about the publisher" form.
+ *
+ * No longer reachable from the buyer UI. As of 14 Sep 2026 a buyer just enters
+ * the publisher's email on /request-site and gets a sign-up link immediately -
+ * see app/actions/publisher-invites.ts. This action, the SiteRequest model and
+ * Admin -> Site requests are kept for the requests already in the system, and
+ * for the fallback where a publisher will not register and we list the site on
+ * the container account ourselves.
+ */
 export async function submitSiteRequestAction(formData: FormData) {
   const user = await requireRole("buyer");
   const back = "/request-site";

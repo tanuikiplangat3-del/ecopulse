@@ -532,12 +532,71 @@ export function sendPublisherLinkToBuyer(input: {
       "Send this link to your publisher",
       `<p>Hi ${esc(buyerName)},</p>
        <p>We have approved <strong>${esc(domain)}</strong>. Please send the link below to
-          ${who} &mdash; it sets up their publisher account so they can list the site and be
+          ${who}, it sets up their publisher account so they can list the site and be
           paid directly.</p>
        <p><a href="${link}">${link}</a></p>
        <p>Once they are set up, <strong>you pay your negotiated rate on your first 3 orders on
           each site they list</strong>. Other buyers pay our standard rate.</p>
        <p>The link works once and expires in 30 days. Tell us if you need a fresh one.</p>`
+    )
+  );
+}
+
+/**
+ * The publisher's own copy of a buyer-generated sign-up link.
+ *
+ * The buyer's name leads, because that is the only reason this mail gets
+ * opened - the publisher has spoken to them, not to us.
+ */
+export function sendBuyerTheirPublisherLink(input: {
+  buyerEmail: string;
+  buyerName: string;
+  publisherEmail: string;
+  publisherName?: string | null;
+  site?: string | null;
+  link: string;
+}) {
+  const { buyerEmail, buyerName, publisherEmail, publisherName, site, link } = input;
+  const who = publisherName ? esc(publisherName) : esc(publisherEmail);
+  return send(
+    buyerEmail,
+    `Your publisher link for ${publisherName || publisherEmail}`,
+    wrap(
+      "Your publisher link",
+      `<p>Hi ${esc(buyerName)},</p>
+       <p>Here is the sign-up link for ${who}${site ? ` (${esc(site)})` : ""}. We have emailed it to
+          them as well, so you only need this if you would rather send it yourself.</p>
+       <p><a href="${link}">${link}</a></p>
+       <p>Once they are set up, <strong>you pay half our standard margin on your first 3 orders on
+          every site they list</strong>. Other buyers pay our standard rate.</p>
+       <p>The link works once and expires in 30 days. You can cancel it or make a new one from
+          Invite publisher in your account.</p>`
+    )
+  );
+}
+
+export function sendPublisherInviteFromBuyer(input: {
+  publisherEmail: string;
+  publisherName?: string | null;
+  buyerName: string;
+  site?: string | null;
+  link: string;
+}) {
+  const { publisherEmail, publisherName, buyerName, site, link } = input;
+  const greeting = publisherName ? `Hi ${esc(publisherName)},` : "Hello,";
+  return send(
+    publisherEmail,
+    `${buyerName} would like to list ${site ? site : "your website"} on Link Tomorrow`,
+    wrap(
+      `${esc(buyerName)} invited you`,
+      `<p>${greeting}</p>
+       <p><strong>${esc(buyerName)}</strong> buys guest posts and backlinks through Link Tomorrow, and
+          asked us to set you up so they can order${site ? ` on ${esc(site)}` : ""} through the platform.</p>
+       <p>Use the link below to create your publisher account. You set your own prices and turnaround,
+          list as many websites as you like, and we pay you <strong>within 72 hours</strong> of the buyer
+          confirming each link is live.</p>
+       <p><a href="${link}">${link}</a></p>
+       <p>It works once and expires in 30 days.</p>`
     )
   );
 }

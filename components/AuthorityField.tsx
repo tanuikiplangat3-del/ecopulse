@@ -38,7 +38,7 @@ export default function AuthorityField({
             className="mt-1"
           />
           <span>
-            <strong className="text-white">Domain Rating (DR)</strong> — we look this up from
+            <strong className="text-white">Domain Rating (DR)</strong>. We look this up from
             Ahrefs for you. Nothing to type.
           </span>
         </label>
@@ -53,7 +53,7 @@ export default function AuthorityField({
             className="mt-1"
           />
           <span>
-            <strong className="text-white">Domain Authority (DA)</strong> — enter it yourself.
+            <strong className="text-white">Domain Authority (DA)</strong>. Enter it yourself.
             Choose this if your site scores better on DA than on DR.
           </span>
         </label>
@@ -73,7 +73,7 @@ export default function AuthorityField({
             />
             <p className="muted mt-2 text-xs">
               A number between 1 and 100. Buyers will see this instead of DR, so please make
-              sure it is accurate — our team checks it against the site.
+              sure it is accurate. Our team checks it against the site.
             </p>
           </div>
         )}

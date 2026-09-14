@@ -136,7 +136,7 @@ export default async function AdminConflicts({
                   <form action={keepCurrentListingAction}>
                     <input type="hidden" name="id" value={incoming.id} />
                     <button className="btn-ghost btn-sm" type="submit">
-                      Keep current — we have the better price
+                      Keep current, we have the better price
                     </button>
                   </form>
                   <Link href={`/admin/listings`} className="btn-ghost btn-sm">
@@ -168,7 +168,7 @@ function Side({
       <div className="rounded-md border border-white/10 bg-white/5 p-4">
         <p className="muted mb-2 text-xs uppercase tracking-wide">{heading}</p>
         <p className="muted text-sm">
-          Nothing live on this domain any more — approving the new listing simply publishes it.
+          Nothing live on this domain any more, approving the new listing simply publishes it.
         </p>
       </div>
     );
@@ -181,9 +181,9 @@ function Side({
     >
       <p className="muted mb-3 text-xs uppercase tracking-wide">{heading}</p>
       <dl className="space-y-2 text-sm">
-        <Row label="Publisher" value={listing.publisher?.name || "—"} />
+        <Row label="Publisher" value={listing.publisher?.name || ","} />
         <Row label="Publisher price" value={money(listing.priceCents)} strong />
-        <Row label="Buyer pays" value={buyerPays !== null ? money(buyerPays) : "—"} />
+        <Row label="Buyer pays" value={buyerPays !== null ? money(buyerPays) : ","} />
         <Row label={authorityFor(listing).label} value={String(authorityFor(listing).value)} />
         {isClaimedAuthority(listing) && (
           <Row label="Ahrefs DR" value={String(listing.domainRating)} />
