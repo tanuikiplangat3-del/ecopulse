@@ -37,7 +37,11 @@ export async function refreshDueMetrics(opts: {
   const deadline = Date.now() + budgetMs;
 
   const cutoff = new Date(Date.now() - REFRESH_AFTER_DAYS * 86400_000);
+  // Demo sites are invented domains. Asking Ahrefs about them burns API units
+  // and would overwrite their hand-set DR with 0, which is the one number the
+  // demo needs to look right.
   const where = {
+    isDemo: false,
     OR: [{ metricsUpdatedAt: null }, { metricsUpdatedAt: { lt: cutoff } }],
   };
 
@@ -45,13 +49,13 @@ export async function refreshDueMetrics(opts: {
   // listings come first, then the longest-stale ones. Nothing gets starved and
   // there is no reliance on database-specific null ordering.
   let due = await prisma.listing.findMany({
-    where: { metricsUpdatedAt: null },
+    where: { isDemo: false, metricsUpdatedAt: null },
     orderBy: { id: "asc" },
     take: maxItems,
   });
   if (due.length < maxItems) {
     const oldest = await prisma.listing.findMany({
-      where: { metricsUpdatedAt: { lt: cutoff } },
+      where: { isDemo: false, metricsUpdatedAt: { lt: cutoff } },
       orderBy: { metricsUpdatedAt: "asc" },
       take: maxItems - due.length,
     });

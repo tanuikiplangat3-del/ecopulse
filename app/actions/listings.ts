@@ -29,7 +29,7 @@ async function makeListing(publisherId: number, data: {
   // Which authority number this site displays. Omitted means DR, which is what
   // every site created before this feature used.
   authorityType?: string; domainAuthority?: number;
-}, opts: { skipAhrefs?: boolean; status?: string; invitedByBuyerId?: number | null } = {}) {
+}, opts: { skipAhrefs?: boolean; status?: string; invitedByBuyerId?: number | null; isDemo?: boolean } = {}) {
   // Canonical form, always. Storing "Example.com" or "www.example.com" would
   // create a second live copy of a domain we already carry.
   const domain = normalizeDomain(data.domain);
@@ -37,7 +37,11 @@ async function makeListing(publisherId: number, data: {
   // Auto-fetch DR from Ahrefs (fails soft to 0). This runs even when the site
   // will display DA, because admins compare the claim against the real DR when
   // approving. Traffic is NOT fetched - it comes from the form.
-  const metrics = opts.skipAhrefs ? { dr: 0, ok: false } : await fetchDomainRating(domain);
+  // Demo domains are invented. Asking Ahrefs about one burns API units and
+  // returns 0, which would wipe out the DR the demo was seeded with. Same rule
+  // lib/metrics.ts applies to the weekly refresh.
+  const metrics =
+    opts.skipAhrefs || opts.isDemo ? { dr: 0, ok: false } : await fetchDomainRating(domain);
   const dr = metrics.dr;
   const traffic = Math.max(0, Math.round(data.monthlyTraffic || 0));
   const authority = {
@@ -81,6 +85,9 @@ async function makeListing(publisherId: number, data: {
       tatDays: data.tatDays || 7,
       description: data.description || "",
       status: opts.status || (autoApprove() ? "approved" : "pending"),
+      // A site added by a demo publisher during a walkthrough is demo
+      // inventory, or it would appear in the real marketplace.
+      isDemo: !!opts.isDemo,
     },
   });
 }
@@ -122,11 +129,16 @@ export async function createListingAction(formData: FormData) {
     redirect(`/new-listing?error=${q("Enter your Domain Authority as a number between 1 and 100, or choose Domain Rating instead.")}${first ? "&first=1" : ""}`);
   }
 
-  const cleanDomain = normalizeDomain(domain);
-  const dupe = await checkDuplicate(cleanDomain);
   // Reloaded rather than taken from the session, so an account that was
-  // attributed to a buyer after signing in still prices correctly.
-  const me = await prisma.user.findUnique({ where: { id: user.id }, select: { invitedByBuyerId: true } });
+  // attributed to a buyer after signing in still prices correctly. Read BEFORE
+  // the duplicate check, which needs isDemo to know which marketplace to look in.
+  const me = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { invitedByBuyerId: true, isDemo: true },
+  });
+
+  const cleanDomain = normalizeDomain(domain);
+  const dupe = await checkDuplicate(cleanDomain, !!me?.isDemo);
 
   await makeListing(user.id, {
     domain,
@@ -148,6 +160,7 @@ export async function createListingAction(formData: FormData) {
     // decides, on Admin -> Conflicts.
     status: dupe.exists ? STATUS_CONFLICT : undefined,
     invitedByBuyerId: me?.invitedByBuyerId ?? null,
+    isDemo: !!me?.isDemo,
   });
 
   revalidatePath("/my-listings");
@@ -167,9 +180,10 @@ export async function bulkUploadAction(formData: FormData) {
   // session, for the same reason.
   const me = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { invitedByBuyerId: true },
+    select: { invitedByBuyerId: true, isDemo: true },
   });
   const invitedBy = me?.invitedByBuyerId ?? null;
+  const isDemo = !!me?.isDemo;
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) redirect(`/bulk-upload?error=${q("Please choose a spreadsheet to upload.")}${first ? "&first=1" : ""}`);
 
@@ -271,6 +285,7 @@ export async function bulkUploadAction(formData: FormData) {
       // is only ever for inventory we did not already carry.
       markupModel: invitedBy ? MARKUP_INVITED : MARKUP_TIERED,
       requestedById: invitedBy,
+      isDemo,
       linkType: "guest_post",
       priceCents: centsFromUsd(price),
       tatDays: 7,
@@ -288,7 +303,7 @@ export async function bulkUploadAction(formData: FormData) {
   // repeated inside the same sheet is also held from the second occurrence on,
   // so an upload cannot quietly list the same site twice.
   // data[].domain is already canonical - normalizeDomain ran on every row above.
-  const alreadyLive = await liveDomains(Array.from(new Set(data.map((r) => r.domain as string))));
+  const alreadyLive = await liveDomains(Array.from(new Set(data.map((r) => r.domain as string))), isDemo);
   const seenInSheet = new Set<string>();
   let conflicts = 0;
   for (const row of data) {
@@ -335,9 +350,6 @@ export async function bulkUploadAction(formData: FormData) {
     (rows.length > MAX_ROWS ? ` Only the first ${MAX_ROWS} rows were read.` : "") +
     (daRows
       ? ` ${daRows} site(s) had a Domain Authority in the DA column and will display DA instead of DR.`
-      : "") +
-    (invitedBy
-      ? ` These sites are priced at your buyer's negotiated rate, except any held for review below.`
       : "") +
     (missingTraffic
       ? ` ${missingTraffic} row(s) had no readable monthly traffic and were listed at 0 - traffic is no longer fetched automatically, so add it on Websites (a live site goes back to our team for a quick check when you change it).`

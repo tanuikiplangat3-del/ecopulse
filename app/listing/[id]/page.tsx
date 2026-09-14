@@ -22,6 +22,11 @@ export default async function ListingPage({
   if (!listing || listing.status !== "approved") notFound();
   const user = await getCurrentUser();
 
+  // Typing a listing id must not cross the demo boundary in either direction:
+  // a prospect being shown the platform never lands on a real publisher's site,
+  // and a real buyer never finds an invented one.
+  if (listing!.isDemo !== !!user?.isDemo) notFound();
+
   // Paywall. Without this check a locked visitor could simply type a listing URL
   // and read everything the marketplace was hiding. A listing is open only if it
   // falls inside the free preview - the newest FREE_PREVIEW_COUNT approved sites,
@@ -29,7 +34,7 @@ export default async function ListingPage({
   const access = await getViewerAccess(user);
   if (!access.unlocked) {
     const newerCount = await prisma.listing.count({
-      where: { status: "approved", createdAt: { gt: listing!.createdAt } },
+      where: { status: "approved", isDemo: listing!.isDemo, createdAt: { gt: listing!.createdAt } },
     });
     if (newerCount >= FREE_PREVIEW_COUNT) {
       redirect(user ? "/topup?locked=1" : "/register");
@@ -97,14 +102,7 @@ export default async function ListingPage({
               requesterRate,
             })
           )}</p>
-          {requesterRate && (
-            <p className="muted mb-4 text-xs">
-              Your negotiated rate, on {ordersLeft} more order{ordersLeft === 1 ? "" : "s"}. After
-              that this site prices at the standard rate of{" "}
-              {money(buyerPrice(listing.priceCents, listing.markupModel, { vatPercent: listing.vatPercent }))}.
-            </p>
-          )}
-          {!requesterRate && <div className="mb-4" />}
+          <div className="mb-4" />
           <Flash searchParams={searchParams} />
 
           {!user && (

@@ -33,7 +33,9 @@ export default async function OrderPage({
   // need in order to pay them live on the original request.
   const inFlight = ["funded", "in_progress"].includes(order!.status);
   const isRequested = order!.listing.markupModel === MARKUP_REQUESTED;
-  const siteRequest = isRequested && order!.listing.siteRequestId
+  // Only fetched for an admin. It holds the publisher's contact and payout
+  // details, so a buyer's page should not even load it.
+  const siteRequest = isAdmin && isRequested && order!.listing.siteRequestId
     ? await prisma.siteRequest.findUnique({ where: { id: order!.listing.siteRequestId } })
     : null;
   const PAY_LABEL: Record<string, string> = {
@@ -67,7 +69,10 @@ export default async function OrderPage({
         </div>
       )}
 
-      {isRequested && (
+      {/* Admin only. This panel carries the publisher's email, phone and payout
+          details, and how we came by the site. None of that is the buyer's to
+          see, and the buyer has their own confirmation box further down. */}
+      {isRequested && isAdmin && (
         <div className="card mb-5 border-wt-yellow/40">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="h3">Requested site</h2>

@@ -39,10 +39,16 @@ export type Viewer = {
 
 /** Work out what the current viewer is allowed to see. */
 export async function getViewerAccess(
-  user: { id: number; role: string; founderNumber?: number | null } | null
+  user: { id: number; role: string; founderNumber?: number | null; isDemo?: boolean | null } | null
 ): Promise<Viewer> {
   // Publishers and admins are never paywalled - they run the marketplace.
   if (user && (user.role === "admin" || user.role === "publisher")) {
+    return { unlocked: true, signedIn: true, depositedCents: 0, shortfallCents: 0, founderNumber: null };
+  }
+  // Neither is a demo account. It has no Stripe deposits and never will, so
+  // without this the demo starts blurring its own websites the moment there are
+  // more than FREE_PREVIEW_COUNT of them.
+  if (user?.isDemo) {
     return { unlocked: true, signedIn: true, depositedCents: 0, shortfallCents: 0, founderNumber: null };
   }
   if (!user) {

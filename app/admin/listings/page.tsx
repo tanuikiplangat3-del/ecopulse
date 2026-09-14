@@ -16,8 +16,11 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
   const pendingCount = listings.filter((l) => l.status === "pending").length;
   // Metrics refresh themselves every REFRESH_AFTER_DAYS days; this counts what is due now.
   const cutoff = new Date(Date.now() - REFRESH_AFTER_DAYS * 86400_000);
+  // Demo sites are never refreshed from Ahrefs (see lib/metrics.ts), so counting
+  // them here would leave the Refresh DR button permanently showing work that
+  // pressing it can never clear.
   const staleCount = listings.filter(
-    (l) => !l.metricsUpdatedAt || l.metricsUpdatedAt < cutoff
+    (l) => !l.isDemo && (!l.metricsUpdatedAt || l.metricsUpdatedAt < cutoff)
   ).length;
 
   // Sites whose country does not match one of the names the marketplace filter
@@ -90,6 +93,7 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
                     {l.markupModel === "invited" && (
                       <span className="badge badge-blue ml-2">buyer&rsquo;s publisher</span>
                     )}
+                    {l.isDemo && <span className="badge badge-yellow ml-2">demo</span>}
                   </div>
                 </td>
                 <td className="muted">{l.publisher.name}</td>

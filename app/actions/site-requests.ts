@@ -231,6 +231,9 @@ export async function approveSiteRequestAction(formData: FormData) {
   const alreadyListed = await prisma.listing.count({
     where: {
       status: "approved",
+      // Real inventory only. A demo row must never make a real domain look like
+      // one we already carry, which would quietly strip the buyer's rate.
+      isDemo: false,
       OR: [
         { domain: { equals: normalizeDomain(req!.domain), mode: "insensitive" } },
         { domain: { equals: `www.${normalizeDomain(req!.domain)}`, mode: "insensitive" } },

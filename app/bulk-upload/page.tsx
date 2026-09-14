@@ -52,8 +52,8 @@ export default async function BulkUploadPage({
         <p className="muted mt-2 text-xs">
           <strong className="text-white">The da column is optional.</strong> Leave it blank and
           we fill in the site&rsquo;s Domain Rating from Ahrefs automatically. Put a number
-          from 1 to 100 in it and that site shows your Domain Authority instead of DR ,
-          use it for sites that score better on DA. Anything we cannot read as a number is
+          from 1 to 100 in it and that site shows your Domain Authority instead of DR.
+          Use it for sites that score better on DA. Anything we cannot read as a number is
           ignored and the site stays on DR.
         </p>
       </div>

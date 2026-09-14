@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { money, buyerPrice, trafficShort, MARKUP_REQUESTED } from "@/lib/money";
 import { Flash } from "@/components/ui";
-import { pendingConflicts, LIVE_STATUS } from "@/lib/duplicates";
+import { pendingConflicts, LIVE_STATUS, normalizeDomain } from "@/lib/duplicates";
 import { authorityFor, isClaimedAuthority } from "@/lib/authority";
 import {
   keepCurrentListingAction,
@@ -38,12 +38,20 @@ export default async function AdminConflicts({
         include: { publisher: { select: { name: true, email: true } } },
       })
     : [];
+  // Keyed on domain AND isDemo. Demo inventory and real inventory are separate
+  // marketplaces, so a demo listing must never be shown as the rival to a real
+  // one - an admin acting on that pairing would take a real site down.
+  // Canonical form, so this screen matches rivals exactly the way liveMatching
+  // does in the actions. Matching on the raw domain here meant a conflict whose
+  // live rival is stored as "www.example.com" or "Example.com" rendered as "no
+  // current listing", while pressing Switch replaced that very rival.
+  const key = (l: any) => `${l.isDemo ? "d" : "r"}:${normalizeDomain(l.domain) || l.domain.toLowerCase()}`;
   const currentByDomain = new Map<string, any>();
-  for (const l of live) if (!currentByDomain.has(l.domain)) currentByDomain.set(l.domain, l);
+  for (const l of live) if (!currentByDomain.has(key(l))) currentByDomain.set(key(l), l);
 
   const rows: Row[] = conflicts.map((incoming) => ({
     incoming,
-    current: currentByDomain.get(incoming.domain) || null,
+    current: currentByDomain.get(key(incoming)) || null,
   }));
 
   return (
@@ -181,9 +189,9 @@ function Side({
     >
       <p className="muted mb-3 text-xs uppercase tracking-wide">{heading}</p>
       <dl className="space-y-2 text-sm">
-        <Row label="Publisher" value={listing.publisher?.name || ","} />
+        <Row label="Publisher" value={listing.publisher?.name || "-"} />
         <Row label="Publisher price" value={money(listing.priceCents)} strong />
-        <Row label="Buyer pays" value={buyerPays !== null ? money(buyerPays) : ","} />
+        <Row label="Buyer pays" value={buyerPays !== null ? money(buyerPays) : "-"} />
         <Row label={authorityFor(listing).label} value={String(authorityFor(listing).value)} />
         {isClaimedAuthority(listing) && (
           <Row label="Ahrefs DR" value={String(listing.domainRating)} />

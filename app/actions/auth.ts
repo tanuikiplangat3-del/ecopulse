@@ -154,17 +154,12 @@ export async function verifyCodeAction(formData: FormData) {
   await prisma.emailVerification.deleteMany({ where: { userId: user!.id } });
 
   // A confirmed buyer is a real one, so this is where a founding slot is
-  // awarded. Buyers only - an admin or publisher never takes one.
-  const slot = user!.role === "buyer" ? await claimFounderSlot(user!.id) : null;
+  // awarded. Buyers only - an admin or publisher never takes one. Awarded
+  // silently: the buyer is never told the perk exists or that there is a limit.
+  if (user!.role === "buyer") await claimFounderSlot(user!.id);
 
   await createSession(user!.id);
-  redirect(
-    `/dashboard?success=${q(
-      slot !== null
-        ? `Email confirmed - and you are founding member #${slot}. The whole marketplace is open to you, with no deposit needed.`
-        : "Email confirmed. Welcome to Link Tomorrow!"
-    )}`
-  );
+  redirect(`/dashboard?success=${q("Email confirmed. Welcome to Link Tomorrow!")}`);
 }
 
 /** Email a fresh 6-digit code to an account that has not been confirmed yet. */
@@ -252,11 +247,13 @@ export async function acceptInviteAction(formData: FormData) {
   // shows "Brought in by" against every publisher who arrived through a link.
   // A watertight version needs the admin to confirm the publisher account, and
   // is not built.
+  const inviter = invite!.requestedById
+    ? await prisma.user.findUnique({
+        where: { id: invite!.requestedById },
+        select: { email: true, isDemo: true },
+      })
+    : null;
   if (invite!.requestedById) {
-    const inviter = await prisma.user.findUnique({
-      where: { id: invite!.requestedById },
-      select: { email: true },
-    });
     if (inviter && inviter.email.trim().toLowerCase() === email) {
       redirect(
         `/accept-invite?token=${q(token)}&error=${q(
@@ -293,6 +290,11 @@ export async function acceptInviteAction(formData: FormData) {
       // negotiated rate for that buyer - see makeListing in actions/listings.ts.
       // An admin invite never carries one.
       invitedByBuyerId: isAdminInvite ? null : invite!.requestedById,
+      // A link created by a demo buyer produces a DEMO publisher. Without this
+      // a walkthrough would mint a real publisher account, and every site it
+      // listed would be real inventory carrying a discount for an account that
+      // cannot even see it.
+      isDemo: !isAdminInvite && !!inviter?.isDemo,
     },
   });
 
@@ -319,7 +321,10 @@ export async function acceptInviteAction(formData: FormData) {
     });
   }
 
-  if (emailEnabled()) {
+  // A demo signup sends nothing. The invite mail is already suppressed for a
+  // demo buyer, so a welcome landing in a stranger's inbox afterwards would be
+  // the same mistake one step later.
+  if (emailEnabled() && !user.isDemo) {
     if (isAdminInvite) {
       await sendAdminSignupAdmin(name, email);
     } else {

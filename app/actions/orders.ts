@@ -40,6 +40,12 @@ export async function placeOrderAction(formData: FormData) {
   if (!listing || listing.status !== "approved") {
     redirect(`/marketplace?error=${q("That listing is not available.")}`);
   }
+  // A demo buyer can only order demo inventory, and a real buyer can never
+  // order a demo site. Checked here because this is where money moves, not just
+  // on the page that showed the button.
+  if (listing!.isDemo !== !!user.isDemo) {
+    redirect(`/marketplace?error=${q("That listing is not available.")}`);
+  }
 
   // Turnaround: only 5, 7 or 10 days are offered.
   let tat = parseInt(String(formData.get("turnaroundDays") || "7"));

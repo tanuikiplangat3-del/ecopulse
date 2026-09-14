@@ -16,7 +16,7 @@ import {
   ADMIN_NOTIFY,
 } from "@/lib/email";
 import { ahrefsEnabled } from "@/lib/ahrefs";
-import { refreshDueMetrics, REFRESH_AFTER_DAYS } from "@/lib/metrics";
+import { refreshDueMetrics } from "@/lib/metrics";
 import { normalizeCountry } from "@/lib/data";
 import { MARKUP_INVITED, MARKUP_TIERED } from "@/lib/money";
 import { STATUS_ARCHIVED } from "@/lib/duplicates";

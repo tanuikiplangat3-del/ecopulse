@@ -32,7 +32,7 @@ export async function keepCurrentListingAction(formData: FormData) {
   if (!incoming || incoming.status !== STATUS_CONFLICT)
     redirect(`${BACK}?error=${q("That listing is no longer awaiting a decision.")}`);
 
-  const rival = await liveRivalFor(incoming!.domain);
+  const rival = await liveRivalFor(incoming!.domain, incoming!.isDemo);
 
   await prisma.listing.update({ where: { id }, data: { status: "rejected" } });
 
@@ -71,7 +71,7 @@ export async function switchToNewListingAction(formData: FormData) {
 
   // Everything currently live on this domain steps aside.
   const replaced = await prisma.listing.updateMany({
-    where: liveMatching(incoming!.domain),
+    where: liveMatching(incoming!.domain, incoming!.isDemo),
     data: { status: STATUS_REPLACED },
   });
   await prisma.listing.update({ where: { id }, data: { status: LIVE_STATUS } });
@@ -115,7 +115,7 @@ export async function resolveAllCheapestAction() {
   let keptCurrent = 0;
 
   for (const incoming of conflicts) {
-    const rival = await liveRivalFor(incoming.domain);
+    const rival = await liveRivalFor(incoming.domain, incoming.isDemo);
 
     // No live rival any more (it was resolved another way) - just publish it.
     if (!rival) {
@@ -126,7 +126,7 @@ export async function resolveAllCheapestAction() {
 
     if (incoming.priceCents < rival.priceCents) {
       await prisma.listing.updateMany({
-        where: liveMatching(incoming.domain),
+        where: liveMatching(incoming.domain, incoming.isDemo),
         data: { status: STATUS_REPLACED },
       });
       await prisma.listing.update({ where: { id: incoming.id }, data: { status: LIVE_STATUS } });

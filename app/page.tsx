@@ -16,9 +16,9 @@ export async function generateMetadata(): Promise<Metadata> {
   let sites = 0;
   let countries = 0;
   try {
-    sites = await prisma.listing.count({ where: { status: "approved" } });
+    sites = await prisma.listing.count({ where: { status: "approved", isDemo: false } });
     const grouped = await prisma.listing.findMany({
-      where: { status: "approved" },
+      where: { status: "approved", isDemo: false },
       distinct: ["country"],
       select: { country: true },
     });
@@ -67,6 +67,9 @@ export default async function HomePage() {
   const featured = await prisma.listing.findMany({
     where: {
       status: "approved",
+      // The home page is for signed-out visitors, so it is always real
+      // inventory. Demo sites must never reach a public page.
+      isDemo: false,
       // Featured on the number buyers actually see, so a strong DA site is not
       // shut out by a weak Ahrefs DR.
       authorityScore: { gte: 50 },

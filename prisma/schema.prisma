@@ -44,6 +44,10 @@ model User {
   // lists is then priced at the inviting buyer's negotiated rate - half margin
   // for their first 3 orders on each site. See lib/requester.ts.
   invitedByBuyerId Int?
+  // Demo accounts. A demo buyer only ever sees demo listings, and a real buyer
+  // never sees one. Used for showing the platform without touching live
+  // inventory or letting a prospect place a real order.
+  isDemo         Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   listings  Listing[]
@@ -87,11 +91,15 @@ model Listing {
   tatDays        Int      @default(7)
   description    String?
   status         String   @default("pending") // pending | approved | rejected
+  // Demo inventory. Shown only to demo accounts, and hidden from everyone else.
+  // Indexed because every buyer-facing listing query now filters on it.
+  isDemo         Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   orders Order[]
 
   @@index([status])
+  @@index([isDemo])
   @@index([publisherId])
   @@index([authorityScore])
 }

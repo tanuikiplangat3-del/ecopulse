@@ -56,10 +56,13 @@ export function normalizeDomain(input: string): string {
  * parks a newcomer as a conflict and the conflict screen, finding no rival,
  * happily publishes it alongside the row it was meant to compete with.
  */
-export function liveMatching(domain: string) {
+export function liveMatching(domain: string, isDemo = false) {
   const canonical = normalizeDomain(domain) || String(domain || "").trim().toLowerCase();
   return {
     status: LIVE_STATUS,
+    // Demo inventory and real inventory are separate marketplaces, so a demo
+    // site must never be treated as a duplicate of a real one or vice versa.
+    isDemo,
     OR: [
       { domain: { equals: canonical, mode: "insensitive" as const } },
       { domain: { equals: `www.${canonical}`, mode: "insensitive" as const } },
@@ -87,9 +90,9 @@ export type DuplicateCheck = {
  * Matched case-insensitively, because rows created before normalisation may be
  * stored as "Example.com" or "www.example.com".
  */
-export async function checkDuplicate(domain: string): Promise<DuplicateCheck> {
+export async function checkDuplicate(domain: string, isDemo = false): Promise<DuplicateCheck> {
   const live = await prisma.listing.findMany({
-    where: liveMatching(domain),
+    where: liveMatching(domain, isDemo),
     select: { id: true, priceCents: true },
     orderBy: { priceCents: "asc" },
   });
@@ -104,9 +107,9 @@ export async function checkDuplicate(domain: string): Promise<DuplicateCheck> {
  * The live listing a newcomer would be competing with - the cheapest one, since
  * that is the price the marketplace is currently showing.
  */
-export async function liveRivalFor(domain: string) {
+export async function liveRivalFor(domain: string, isDemo = false) {
   return prisma.listing.findFirst({
-    where: liveMatching(domain),
+    where: liveMatching(domain, isDemo),
     orderBy: [{ priceCents: "asc" }, { createdAt: "asc" }],
     include: { publisher: { select: { id: true, name: true, email: true } } },
   });
@@ -116,14 +119,14 @@ export async function liveRivalFor(domain: string) {
  * Which of these domains are already live? One query for a whole spreadsheet,
  * so a 1,000-row upload does not become 1,000 lookups.
  */
-export async function liveDomains(domains: string[]): Promise<Set<string>> {
+export async function liveDomains(domains: string[], isDemo = false): Promise<Set<string>> {
   if (domains.length === 0) return new Set();
   const wanted = new Set(domains.map(normalizeDomain));
   // Every live domain, then compared in canonical form here. An `in` query
   // would be case-sensitive and blind to a "www." prefix, which is exactly the
   // bypass this guard exists to stop. It is one column on a few hundred rows.
   const rows = await prisma.listing.findMany({
-    where: { status: LIVE_STATUS },
+    where: { status: LIVE_STATUS, isDemo },
     select: { domain: true },
   });
   const live = new Set<string>();
@@ -152,9 +155,9 @@ export async function countConflicts(): Promise<number> {
  * that domain stays live. Kept for the rare case where two listings end up live
  * at once; the normal path is now an admin decision, not this.
  */
-export async function archiveDearerDuplicates(domain: string): Promise<number> {
+export async function archiveDearerDuplicates(domain: string, isDemo = false): Promise<number> {
   const live = await prisma.listing.findMany({
-    where: liveMatching(domain),
+    where: liveMatching(domain, isDemo),
     select: { id: true, priceCents: true, createdAt: true },
     orderBy: [{ priceCents: "asc" }, { createdAt: "asc" }],
   });

@@ -47,10 +47,7 @@ export default async function RequestSitePage({
       <h1 className="h2 mb-1">Invite publisher</h1>
       <p className="muted mb-6">
         Negotiated a good price? We will reward you with a discounted price to use the platform.
-        Put in your publisher&rsquo;s email and we will make you a sign-up link to send them. They
-        set up their own account, list their sites and get paid directly, and because you brought
-        them in, <strong className="text-white">you pay half our standard margin on your first 3
-        orders on every site they list</strong>. Every other buyer pays the standard rate.
+        Put in your publisher&rsquo;s email and we will make you a sign-up link to send them.
       </p>
       <Flash searchParams={searchParams} />
 
@@ -81,8 +78,7 @@ export default async function RequestSitePage({
 
         <button className="btn-primary mt-5 w-full" type="submit">Create the link</button>
         <p className="muted mt-3 text-center text-xs">
-          Nothing else needed. The publisher sets their own price, turnaround and payment details
-          when they sign up. Each link works once and expires in {INVITE_DAYS} days.
+          Each link works once and expires in {INVITE_DAYS} days.
         </p>
       </form>
 
@@ -146,12 +142,6 @@ export default async function RequestSitePage({
                     </>
                   )}
 
-                  {i.acceptedAt && (
-                    <p className="muted mt-2 text-xs">
-                      Your rate applies to every site {who ? who.name : "they"} lists. Half our
-                      standard margin on your first 3 orders on each one.
-                    </p>
-                  )}
                 </div>
               );
             })}
@@ -159,11 +149,7 @@ export default async function RequestSitePage({
         )}
       </div>
 
-      <p className="muted mt-6 text-center text-sm">
-        Publisher will not sign up themselves? Email{" "}
-        <a className="text-wt-green" href="mailto:hello@welcometomorrow.io">hello@welcometomorrow.io</a>{" "}
-        with the details you agreed and we will list the site for you instead.
-      </p>
+      <p className="muted mt-6 text-center text-sm">Publisher will not sign up themselves? Chat us.</p>
     </div>
   );
 }

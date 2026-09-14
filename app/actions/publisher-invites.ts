@@ -99,8 +99,10 @@ export async function createPublisherInviteAction(formData: FormData) {
 
   const link = `${appUrl()}/accept-invite?token=${token}`;
 
+  // A demo walkthrough must not put real mail in a stranger's inbox. The link
+  // still appears on screen, which is all a demo needs.
   // The link is on screen either way, so a mail failure must never lose it.
-  if (emailEnabled()) {
+  if (emailEnabled() && !user.isDemo) {
     try {
       await sendPublisherInviteFromBuyer({
         publisherEmail: email,
@@ -123,7 +125,13 @@ export async function createPublisherInviteAction(formData: FormData) {
   }
 
   revalidatePath(back);
-  redirect(`${back}?success=${q(`Link ready for ${email}. We have emailed it to them and to you - it is below to copy too.`)}`);
+  redirect(
+    `${back}?success=${q(
+      user.isDemo
+        ? `Link ready for ${email}. It is below to copy.`
+        : `Link ready for ${email}. We have emailed it to them and to you, and it is below to copy too.`
+    )}`
+  );
 }
 
 /** A buyer cancels one of their own links that nobody has used yet. */

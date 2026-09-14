@@ -66,7 +66,7 @@ export default async function AdminInvites({ searchParams }: { searchParams: { [
                 <td className="muted">
                   {i.requestedById
                     ? buyerById.get(i.requestedById)?.name || `buyer #${i.requestedById}`
-                    : ","}
+                    : "-"}
                 </td>
                 <td>
                   {i.acceptedAt ? <span className="badge badge-green">accepted</span>

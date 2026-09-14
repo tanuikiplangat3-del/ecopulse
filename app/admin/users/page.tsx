@@ -5,6 +5,8 @@ import { money } from "@/lib/money";
 import { Flash } from "@/components/ui";
 import { deleteUserAction } from "@/app/actions/admin";
 import { FOUNDER_BUYER_LIMIT } from "@/lib/money";
+import { resetDemoDataAction } from "@/app/actions/demo";
+import { DEMO_BUYER_EMAIL, DEMO_PUBLISHER_EMAIL, DEMO_SITES } from "@/lib/demo";
 
 export const metadata = { title: "Users" };
 
@@ -20,6 +22,7 @@ export default async function AdminUsers({
   const buyers = users.filter((u) => u.role === "buyer");
   const admins = users.filter((u) => u.role === "admin");
   const founders = users.filter((u) => u.founderNumber !== null).length;
+  const demoReady = users.some((u) => u.email === DEMO_BUYER_EMAIL) && users.some((u) => u.email === DEMO_PUBLISHER_EMAIL);
   // Publishers a buyer brought in through a link, so the pricing on their sites
   // is visible from here rather than only in the database.
   const buyerById = new Map<number, any>(users.map((u) => [u.id, u]));
@@ -33,6 +36,32 @@ export default async function AdminUsers({
         for life.
       </p>
       <Flash searchParams={searchParams} />
+
+      <div className="card mb-8 border-wt-yellow/40">
+        <h2 className="h3 mb-1">Demo accounts</h2>
+        <p className="muted mb-4 text-sm">
+          A separate sandbox for showing the platform. The demo buyer and demo publisher only ever
+          see {DEMO_SITES.length} demo websites, and nobody else can see them. Two of the
+          {" "}{DEMO_SITES.length} are attributed to the demo buyer, and one of those costs the same
+          as a site that is not, so the price difference shows on screen.
+          {demoReady
+            ? " The accounts exist. Running this again resets the websites and sets a new password."
+            : " Not created yet."}
+        </p>
+        <form action={resetDemoDataAction} className="flex flex-wrap items-end gap-3">
+          <label className="field mb-0 flex-1">
+            <span>Password for both demo accounts</span>
+            <input className="input" type="password" name="demoPassword" required autoComplete="new-password" />
+          </label>
+          <button className="btn-accent" type="submit">
+            {demoReady ? "Reset demo data" : "Create demo data"}
+          </button>
+        </form>
+        <p className="muted mt-3 text-xs">
+          Sign in as <span className="font-mono">{DEMO_BUYER_EMAIL}</span> or{" "}
+          <span className="font-mono">{DEMO_PUBLISHER_EMAIL}</span>.
+        </p>
+      </div>
 
       <Section title="Publishers" count={publishers.length}>
         <UserTable users={publishers} meId={me.id} kind="publisher" buyerById={buyerById} />
@@ -91,6 +120,7 @@ function UserTable({
                 ) : (
                   u.name
                 )}
+                {u.isDemo && <span className="badge badge-yellow ml-2">demo</span>}
               </td>
               <td className="muted">{u.email}</td>
               {kind === "buyer" && <td>{money(u.balanceCents)}</td>}

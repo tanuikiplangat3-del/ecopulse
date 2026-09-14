@@ -10,6 +10,7 @@ import { centsFromUsd, filterFloorFromBuyer, filterCeilingFromBuyer } from "@/li
 import { getViewerAccess, maskListing, FREE_PREVIEW_COUNT } from "@/lib/access";
 import { requesterRateListingIds } from "@/lib/requester";
 import { one } from "@/lib/util";
+import { demoScope } from "@/lib/demo";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,10 @@ export default async function MarketplacePage({
   const min = parseFloat(one(searchParams.min));
   const max = parseFloat(one(searchParams.max));
 
-  const where: any = { status: "approved" };
+  // Demo accounts see demo inventory and nothing else; everyone else, signed in
+  // or not, sees only real inventory. Applied before any other filter so there
+  // is no path through this page that can cross the two.
+  const where: any = { status: "approved", ...demoScope(user) };
   // Domains are stored lower case now, so a case-sensitive contains would make
   // a buyer typing "Example" match nothing.
   if (qStr) where.domain = { contains: qStr, mode: "insensitive" };
@@ -112,16 +116,6 @@ export default async function MarketplacePage({
       <h1 className="h2 mb-1">Marketplace</h1>
       <p className="muted mb-6">Browse vetted sites and acquire your placement.</p>
       <Flash searchParams={searchParams} />
-
-      {access.founderNumber !== null && (
-        <div className="card mb-6 border-wt-green/40 text-center">
-          <p className="text-sm">
-            <span className="font-bold text-wt-green">Founding member #{access.founderNumber}</span>.
-            You have full access to every website on the marketplace, with no deposit needed.
-            That is yours for good.
-          </p>
-        </div>
-      )}
 
       {user && (
         <form className="card mb-6 grid gap-4 md:grid-cols-7" method="get">
