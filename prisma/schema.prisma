@@ -41,18 +41,36 @@ model User {
   founderNumber  Int?     @unique
   // PUBLISHER BROUGHT IN BY A BUYER. Set when a publisher registers through a
   // link generated from that buyer's site request. Every site this publisher
-  // lists is then priced at the inviting buyer's negotiated rate - half margin
-  // for their first 3 orders on each site. See lib/requester.ts.
+  // lists is then priced at the inviting buyer's negotiated rate - the flat
+  // brought-in commission, for as long as they keep buying. See
+  // lib/requester.ts and broughtInFee() in lib/money.ts.
   invitedByBuyerId Int?
   // Demo accounts. A demo buyer only ever sees demo listings, and a real buyer
   // never sees one. Used for showing the platform without touching live
   // inventory or letting a prospect place a real order.
   isDemo         Boolean  @default(false)
+  // SIMULATED BUYER. A real buyer account in every respect - real login, real
+  // marketplace, real orders, real publisher payouts - except that its balance
+  // was credited by an admin instead of paid by card. Used for the accounts we
+  // buy placements on ourselves. Everything it spends is reported separately on
+  // Admin -> Simulated accounts and kept out of the real revenue totals,
+  // because that money never existed.
+  isSimulated    Boolean  @default(false)
+  // PUBLISHER PAYOUT METHOD REVIEW. PayPal is approved on sight. Anything else
+  // is a request: "pending" until an admin says whether we can pay that way,
+  // and the publisher is promised an answer within 24 hours.
+  payStatus      String   @default("approved") // approved | pending | rejected
+  payNote        String?  // the admin's answer, shown to the publisher
+  payRequestedAt DateTime?
+  // Invoice instead of stored details: this publisher sends an invoice with
+  // every live URL rather than being paid to details held on file.
+  payInvoiceMode Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   listings  Listing[]
   orders    Order[]    @relation("BuyerOrders")
   walletTx  WalletTx[]
+  simulatedCredits SimulatedCredit[]
 }
 
 model Listing {
@@ -81,7 +99,7 @@ model Listing {
   // Which buyer-pricing rule applies. Sites listed before the tiered pricing
   // launch keep "flat30" (+$30) for life; everything new is created as "tiered".
   markupModel    String   @default("flat30")
-  // Buyer-requested sites: the buyer who negotiated the deal pays cost + 5%,
+  // Sites a buyer brought in: that buyer pays the flat brought-in commission,
   // everyone else pays the standard tiered margin.
   requestedById  Int?
   siteRequestId  Int?
@@ -137,6 +155,11 @@ model Order {
   refundedCents  Int      @default(0)
   cancelledBy    String?   // buyer | publisher | admin | system
   cancelledAt    DateTime?
+  // Publishers on invoice terms attach one with the live URL. Held as a link,
+  // which is what they asked for: they send an invoice each time rather than
+  // keeping payment details on file.
+  invoiceName    String?
+  invoiceUrl     String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -155,6 +178,27 @@ model WalletTx {
   method     String?
   note       String?
   createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+// An admin crediting a simulated buyer account.
+//
+// Kept as its own table rather than as another WalletTx kind for one reason:
+// the report has to separate money that was never real from money that was, and
+// WalletTx only stores the net figure with the gross buried in a text note. The
+// buyer still gets an ordinary WalletTx row as well, so their wallet history
+// looks exactly like anyone else's.
+model SimulatedCredit {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grossCents  Int      @default(0) // what a real buyer would have paid
+  feeCents    Int      @default(0) // the 5% service fee, withheld exactly as usual
+  netCents    Int      @default(0) // what landed on the balance
+  note        String?
+  createdById Int      @default(0) // the admin who added it
+  createdAt   DateTime @default(now())
 
   @@index([userId])
 }

@@ -23,7 +23,7 @@ import { prisma } from "@/lib/prisma";
  * guard is trivially bypassed - "Example.com" and "www.example.com" both slip
  * past a check for "example.com", which publishes a second copy of a site we
  * already carry AND, for a publisher invited by a buyer, hands that buyer a
- * fresh 3-order discount allowance on each spelling.
+ * second reduced-rate listing on each spelling.
  */
 export function normalizeDomain(input: string): string {
   const cleaned = String(input || "")
@@ -135,6 +135,30 @@ export async function liveDomains(domains: string[], isDemo = false): Promise<Se
     if (wanted.has(canonical)) live.add(canonical);
   }
   return live;
+}
+
+/**
+ * Is this domain on the platform at all, whatever state it is in?
+ *
+ * Wider than liveMatching() on purpose. A site sitting in review or held on a
+ * conflict is still a publisher we already have, so a buyer must not be sent
+ * off to invite them a second time and be promised a rate we would then have
+ * to take back.
+ */
+export async function domainOnPlatform(domain: string, isDemo = false): Promise<boolean> {
+  const canonical = normalizeDomain(domain);
+  if (!canonical) return false;
+  const count = await prisma.listing.count({
+    where: {
+      isDemo,
+      status: { in: [LIVE_STATUS, "pending", STATUS_CONFLICT] },
+      OR: [
+        { domain: { equals: canonical, mode: "insensitive" } },
+        { domain: { equals: `www.${canonical}`, mode: "insensitive" } },
+      ],
+    },
+  });
+  return count > 0;
 }
 
 /** Everything currently waiting on an admin decision, newest first. */

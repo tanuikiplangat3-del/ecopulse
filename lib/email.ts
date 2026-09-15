@@ -208,9 +208,9 @@ export function sendSiteRequestAdmin(input: {
           <strong>Negotiated price:</strong> ${money(input.negotiatedCents)}<br>
           <strong>VAT:</strong> ${input.vatPercent > 0 ? input.vatPercent + "%" : "none"}</p>
        <p>Approve or reject it on the admin <strong>Site requests</strong> page. Approving lists it
-          immediately: this buyer will see half the standard margin on their first 3 orders, and
-          every other buyer will see the standard margin. If we already list this domain, it is
-          created at standard pricing for everyone.</p>`
+          immediately: this buyer will see the rate they negotiated, and every other buyer will see
+          the standard margin. If we already list this domain, it is created at standard pricing for
+          everyone.</p>`
     )
   );
 }
@@ -589,6 +589,59 @@ export function sendPublisherInviteFromBuyer(input: {
        <p>Use the link below to create your publisher account and list your websites.</p>
        <p><a href="${link}">${link}</a></p>
        <p>It works once and expires in 30 days.</p>`
+    )
+  );
+}
+
+/**
+ * A publisher has asked to be paid by something other than PayPal.
+ *
+ * Whether we can actually pay that way depends on where we bank, not on the
+ * platform, so it is a human decision. The publisher has been promised an
+ * answer within 24 hours, which is why this goes out the moment they save.
+ */
+export function sendPayoutMethodRequestAdmin(input: {
+  publisherName: string;
+  publisherEmail: string;
+  method: string;
+  details: string;
+}) {
+  return send(
+    ADMIN_NOTIFY,
+    `Payout method to review: ${input.publisherName}`,
+    wrap(
+      "A publisher wants to be paid another way",
+      `<p><strong>${esc(input.publisherName)}</strong> (${esc(input.publisherEmail)}) has asked to be
+          paid by <strong>${esc(input.method)}</strong> instead of PayPal.</p>
+       <p><strong>What they gave us:</strong></p>
+       <p>${esc(input.details || "nothing")}</p>
+       <p>They have been told they will hear back within 24 hours. Approve or decline it on the
+          admin <strong>Payout methods</strong> page.</p>`
+    ),
+    input.publisherEmail
+  );
+}
+
+/** The answer to that request, in the publisher's inbox. */
+export function sendPayoutMethodDecision(input: {
+  to: string;
+  approved: boolean;
+  method: string;
+  note: string;
+}) {
+  return send(
+    input.to,
+    input.approved ? "Your payment method is set up" : "About your payment method",
+    wrap(
+      input.approved ? "You are all set" : "We cannot pay that way",
+      input.approved
+        ? `<p>We can pay you by <strong>${esc(input.method)}</strong>. Nothing more to do - your
+              earnings will go there.</p>
+           ${input.note ? `<p>${esc(input.note)}</p>` : ""}`
+        : `<p>We are not able to send payments by <strong>${esc(input.method)}</strong>.</p>
+           ${input.note ? `<p>${esc(input.note)}</p>` : ""}
+           <p>Please open your payment details and choose another method. PayPal is the one we can
+              always pay to.</p>`
     )
   );
 }

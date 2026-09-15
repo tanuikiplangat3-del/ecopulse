@@ -95,39 +95,55 @@ export const MARKUP_REQUESTED = "requested";
 export const MARKUP_INVITED = "invited";
 
 /* ---------------------------------------------------------------------------
- * Buyer-requested sites
+ * Sites a buyer brought in
  *
- * A buyer who brings us a publisher we do not carry gets a discount, not a way
- * round the marketplace. They pay HALF the margin everyone else pays, so the
- * reward scales with the band and always leaves a real operating margin:
+ * A buyer who brings us a publisher they negotiated with pays a flat
+ * commission on that publisher's sites instead of the tiered margin, and keeps
+ * it for as long as they keep buying. Everyone else pays exactly the ordinary
+ * tiered price, to the cent.
  *
- *   $100 site  -> others $145.00, requester $122.50
- *   $300 site  -> others $375.00, requester $337.50
+ *   publisher price under $100    ->  $10
+ *   $100 up to under $200         ->  $20
+ *   $200 and above                ->  10%
  *
- * The discount runs out after REQUESTER_ORDER_LIMIT orders on that listing;
- * after that they pay the standard rate like anyone else.
+ * The two floors are what keeps a cheap site worth handling. Ten per cent of a
+ * $30 site is $3.00 and a single payout costs more than that. They meet the
+ * 10% exactly at $200 ($20 either way), so the buyer price never falls as the
+ * publisher price rises.
  *
- * MIN_PLATFORM_FEE_CENTS applies to MARKUP_REQUESTED sites only. Their
- * publishers have no account here, so every payout is a manual PayPal or bank
- * transfer - on a cheap site the transfer fee alone can exceed the margin.
+ *   $30 site   -> others $43.50, brought in by them $40.00
+ *   $100 site  -> others $145.00, brought in by them $120.00
+ *   $300 site  -> others $375.00, brought in by them $330.00
  *
- * It does NOT apply to MARKUP_INVITED. Those publishers are paid automatically
- * like any other, so the manual-transfer cost the floor covers does not exist -
- * and applying it there would break the rule outright: on a $50 site the floor
- * swallows the whole discount (requester and everyone else both pay $75.00) and
- * makes an invited site DEARER for every buyer than the same site listed
- * normally ($72.50 tiered). An ordinary buyer must pay exactly the ordinary
- * margin, which is what Cosmas asked for on 14 Sep 2026.
+ * Both models that mean "this buyer brought us this publisher" price the same
+ * way: MARKUP_INVITED (the publisher registered through their link) and
+ * MARKUP_REQUESTED (the publisher would not register, so we list it ourselves).
+ * Every payout is manual, so the old split, where only "requested" carried a
+ * floor because only it was paid by hand, no longer describes anything real.
  * ------------------------------------------------------------------------- */
 
-/** The requester pays this share of the normal margin. */
-export const REQUESTER_MARGIN_SHARE = 0.5;
+/** Commission on a site the buyer brought in, once past the floors. */
+export const BROUGHT_IN_RATE = 0.1;
 
-/** Never earn less than this on a requested site, whoever is buying. */
-export const MIN_PLATFORM_FEE_CENTS = 2500; // $25
+/** Publisher price below which the first floor applies. */
+export const BROUGHT_IN_BAND_1_CENTS = 10000; // $100
+/** Publisher price below which the second floor applies. */
+export const BROUGHT_IN_BAND_2_CENTS = 20000; // $200
 
-/** How many orders one requester gets at their reduced rate, per listing. */
-export const REQUESTER_ORDER_LIMIT = 3;
+/** Never earn less than this on a site under $100. */
+export const BROUGHT_IN_FLOOR_1_CENTS = 1000; // $10
+/** Never earn less than this on a site from $100 up to $200. */
+export const BROUGHT_IN_FLOOR_2_CENTS = 2000; // $20
+
+/**
+ * What we charge the buyer who brought in this publisher, on top of the
+ * publisher's price (VAT already included in `baseCents`, as everywhere else).
+ */
+export function broughtInFee(baseCents: number): number {
+  if (baseCents < BROUGHT_IN_BAND_1_CENTS) return BROUGHT_IN_FLOOR_1_CENTS;
+  if (baseCents < BROUGHT_IN_BAND_2_CENTS) return BROUGHT_IN_FLOOR_2_CENTS;
+  return Math.round(baseCents * BROUGHT_IN_RATE);
+}
 
 /**
  * The publisher's price with VAT added. VAT is charged on top and passed
@@ -143,20 +159,19 @@ export function listingBaseCents(publisherCents: number, vatPercent?: number | n
 /**
  * What a buyer pays for a listing, in cents.
  *
- * Three rules are live at once:
+ * Four rules are live at once:
  *   flat30    - sites listed before tiered pricing: publisher price + $30, for life
  *   tiered    - everything listed since: +45% / +25% by band
  *   requested - a site a buyer negotiated themselves, listed by us on the
- *               container account. That buyer pays half the normal margin for
- *               their first few orders; everyone else, and that buyer
- *               afterwards, pays the standard margin, with a $25 floor.
- *   invited   - a site listed by a publisher who joined through that buyer's
- *               link. Identical to tiered for everyone else - no floor - and
- *               half margin for the inviting buyer on their first few orders.
+ *               container account because the publisher would not register
+ *   invited   - a site listed by a publisher who registered through that
+ *               buyer's link
  *
- * `requesterRate` is NOT simply "is this the requester". The caller must have
- * already checked that they are the requester AND still have orders left at the
- * reduced rate - see lib/requester.ts, which is the only correct source for it.
+ * On the last two, the buyer who brought the publisher in pays the flat
+ * commission above. Everyone else pays exactly the ordinary tiered price.
+ *
+ * `requesterRate` means "this viewer is the buyer who brought this publisher
+ * in". lib/requester.ts is the only correct source for it.
  */
 export function buyerPrice(
   publisherCents: number,
@@ -165,18 +180,17 @@ export function buyerPrice(
 ): number {
   const base = listingBaseCents(publisherCents, opts?.vatPercent);
 
-  if (markupModel === MARKUP_REQUESTED) {
+  if (markupModel === MARKUP_REQUESTED || markupModel === MARKUP_INVITED) {
     const standardFee = Math.round(base * markupRate(base));
-    const fee = opts?.requesterRate ? Math.round(standardFee * REQUESTER_MARGIN_SHARE) : standardFee;
-    // The floor covers the manual payout these sites always need.
-    return base + Math.max(fee, MIN_PLATFORM_FEE_CENTS);
-  }
-  if (markupModel === MARKUP_INVITED) {
-    // Exactly the tiered curve, halved for the inviting buyer while their
-    // allowance lasts. No floor: see the note above MIN_PLATFORM_FEE_CENTS.
-    const standardFee = Math.round(base * markupRate(base));
-    const fee = opts?.requesterRate ? Math.round(standardFee * REQUESTER_MARGIN_SHARE) : standardFee;
-    return base + fee;
+    // The buyer who brought this publisher in pays the flat commission. Capped
+    // at the ordinary margin, because below about $22 the $10 floor is actually
+    // MORE than the tiered margin - and the one rule that must never break is
+    // that bringing us a publisher can never cost you more than not bothering.
+    if (opts?.requesterRate) return base + Math.min(broughtInFee(base), standardFee);
+    // Everyone else pays the ordinary tiered price, to the cent, with no floor.
+    // A site someone brought us must never be dearer for an ordinary buyer than
+    // the same site listed the normal way.
+    return base + standardFee;
   }
   if (markupModel === MARKUP_TIERED) {
     return Math.round(base * (1 + markupRate(base)));

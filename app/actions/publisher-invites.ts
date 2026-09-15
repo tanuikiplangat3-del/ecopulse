@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/auth";
 import { appUrl } from "@/lib/stripe";
 import { emailEnabled, sendPublisherInviteFromBuyer, sendBuyerTheirPublisherLink } from "@/lib/email";
 import { INVITE_DAYS, MAX_OPEN_INVITES, MAX_TOTAL_INVITES } from "@/lib/invites";
+import { domainOnPlatform, normalizeDomain } from "@/lib/duplicates";
 
 const q = (s: string) => encodeURIComponent(s);
 const back = "/request-site";
@@ -19,8 +20,13 @@ const back = "/request-site";
  * already done the negotiating; we are not re-collecting the price, the VAT or
  * the payout details, because the publisher sets all of that themselves when
  * they list. Whoever registers through this link is attributed to this buyer,
- * so the buyer pays half our margin on their first 3 orders on each site that
- * publisher lists.
+ * so the buyer pays their negotiated commission on every site that publisher
+ * lists.
+ *
+ * The website is required, and it is the one thing checked before a link is
+ * made. A publisher we already carry must not be invited a second time: the
+ * buyer would be promised a rate on inventory we already have, and the listing
+ * would land in the conflicts queue with nothing to settle.
  */
 export async function createPublisherInviteAction(formData: FormData) {
   const user = await requireRole("buyer");
@@ -33,6 +39,18 @@ export async function createPublisherInviteAction(formData: FormData) {
   }
   if (email === user.email.trim().toLowerCase()) {
     redirect(`${back}?error=${q("That is your own email address. The link is for the publisher you negotiated with.")}`);
+  }
+
+  const domain = normalizeDomain(site);
+  if (!domain) {
+    redirect(`${back}?error=${q("Enter the publisher's website, for example konemedia.co.ke")}`);
+  }
+
+  // We already carry this website. Shown as a pop-up rather than a banner:
+  // there is nothing to correct on the form, so the buyer needs to stop and
+  // talk to us rather than edit and resubmit.
+  if (await domainOnPlatform(domain, !!user.isDemo)) {
+    redirect(`${back}?exists=${q(domain)}`);
   }
 
   // Already on the platform. One message for every case: three different

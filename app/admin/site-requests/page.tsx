@@ -47,20 +47,19 @@ export default async function AdminSiteRequests({
             const buyer = buyerById.get(r.buyerId);
             const base = listingBaseCents(r.negotiatedCents, r.vatPercent);
             // Priced as an invited-publisher listing, which is what the link
-            // produces: the tiered margin for everyone, halved for this buyer
-            // on their first 3 orders per site. The publisher sets their own
-            // price when they list, so this is an estimate from the price the
-            // buyer told us they negotiated.
+            // produces: the tiered margin for everyone, the flat brought-in
+            // commission for this buyer. The publisher sets their own price
+            // when they list, so this is an estimate from the price the buyer
+            // told us they negotiated.
             const requesterPays = buyerPrice(r.negotiatedCents, MARKUP_INVITED, {
               vatPercent: r.vatPercent,
               requesterRate: true,
             });
             const othersPay = buyerPrice(r.negotiatedCents, MARKUP_INVITED, { vatPercent: r.vatPercent });
-            // "List it myself instead" produces a MARKUP_REQUESTED listing, which
-            // carries the $25 floor because we pay that publisher by hand. On a
-            // cheap site that is a different number entirely - and quoting the
-            // link price to a buyer who then gets the fallback is how a promise
-            // gets broken.
+            // "List it myself instead" produces a MARKUP_REQUESTED listing.
+            // Both models price identically now, so these two normally match -
+            // the comparison is kept so that if they ever diverge again the
+            // fallback price is on screen before an admin promises one.
             const fbRequester = buyerPrice(r.negotiatedCents, MARKUP_REQUESTED, {
               vatPercent: r.vatPercent,
               requesterRate: true,
@@ -97,7 +96,7 @@ export default async function AdminSiteRequests({
                     <p className="text-lg font-bold">{r.vatApplies ? money(base - r.negotiatedCents) : "-"}</p>
                   </div>
                   <div>
-                    <p className="muted text-xs">This buyer pays (first 3 orders per site)</p>
+                    <p className="muted text-xs">This buyer pays</p>
                     <p className="text-lg font-bold text-wt-green">{money(requesterPays)}</p>
                   </div>
                   <div>

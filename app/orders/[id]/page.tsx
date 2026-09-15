@@ -112,6 +112,7 @@ export default async function OrderPage({
           <Info label="Anchor text" value={order!.anchorText || "-"} />
           <Info label="Turnaround" value={`${order!.turnaroundDays} days`} />
           {order!.liveUrl && <Info label="Live URL" value={order!.liveUrl} />}
+          {isAdmin && order!.invoiceUrl && <Info label="Invoice" value={order!.invoiceUrl} />}
           {isAdmin && <Info label="Buyer" value={order!.buyer.name} />}
           {isAdmin && <Info label="Publisher" value={order!.listing.publisher.name} />}
         </dl>
@@ -199,6 +200,15 @@ export default async function OrderPage({
               <span>Live URL where the link is published</span>
               <input className="input" name="liveUrl" placeholder="https://yoursite.com/the-post" required />
             </label>
+            {order!.listing.publisher.payInvoiceMode && (
+              <label className="field">
+                <span>Link to your invoice</span>
+                <input className="input" name="invoiceUrl" placeholder="https://drive.google.com/..." required />
+                <small className="muted">
+                  You chose to invoice for each placement, so we need one with every live link.
+                </small>
+              </label>
+            )}
             <button className="btn-primary" type="submit">Submit live URL</button>
           </form>
         </div>

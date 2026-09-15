@@ -10,6 +10,7 @@ import { checkDuplicate, liveDomains, normalizeDomain, STATUS_CONFLICT } from "@
 import { normalizeCountry } from "@/lib/data";
 import { fetchDomainRating } from "@/lib/ahrefs";
 import { parseTrafficCell, parseTrafficInput } from "@/lib/traffic";
+import { emailEnabled, sendPayoutMethodRequestAdmin } from "@/lib/email";
 import {
   AUTHORITY_DA,
   authorityScoreFor,
@@ -63,7 +64,7 @@ async function makeListing(publisherId: number, data: {
       domainAuthority: authority.domainAuthority,
       authorityScore: authorityScoreFor(authority),
       // A publisher who joined through a buyer's link prices at that buyer's
-      // negotiated rate: half margin for the buyer's first 3 orders on THIS
+      // negotiated rate: their flat commission on THIS
       // site, standard tiered margin for everyone else and for that buyer
       // afterwards. Everyone else's sites are plain tiered.
       //
@@ -369,21 +370,89 @@ export async function deleteListingAction(formData: FormData) {
   redirect(`/my-listings?success=${q("Website removed.")}`);
 }
 
+/**
+ * A publisher saves how they want to be paid.
+ *
+ * PayPal is what we pay with as standard and it is approved on the spot.
+ * Anything else is a request: it is saved as "pending", an admin is told, and
+ * the publisher is promised an answer within 24 hours. That promise is on the
+ * form, so nobody is left assuming a bank account they typed in is live.
+ *
+ * Invoice terms are the third option and need no review at all. Nothing is held
+ * on file; the publisher attaches an invoice to each live link and we pay
+ * against it.
+ *
+ * An admin decision is never quietly undone here: editing the details of a
+ * method that was already approved leaves it approved, and only switching to a
+ * different non-PayPal method sends it back for review.
+ */
 export async function savePayoutAction(formData: FormData) {
   const user = await requireRole("publisher");
   const first = String(formData.get("first") || "") === "1";
+  const invoiceMode = String(formData.get("payInvoiceMode") || "") === "on";
+  const method = String(formData.get("payMethod") || "paypal").trim() || "paypal";
+  const paypal = String(formData.get("payPaypal") || "").trim();
+  const mpesa = String(formData.get("payMpesa") || "").trim();
+  const bank = String(formData.get("payBank") || "").trim();
+  const other = String(formData.get("payCard") || "").trim();
+
+  if (!invoiceMode) {
+    const missing =
+      (method === "paypal" && !paypal) ||
+      (method === "mpesa" && !mpesa) ||
+      (method === "bank" && !bank) ||
+      (method === "other" && !other);
+    if (missing) redirect(`/payout?error=${q("Please fill in the details for the method you chose.")}`);
+    if (method === "paypal" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(paypal))
+      redirect(`/payout?error=${q("Enter a valid PayPal email address.")}`);
+  }
+
+  const me = await prisma.user.findUnique({ where: { id: user.id } });
+  const alreadyCleared = me?.payStatus === "approved" && me?.payMethod === method;
+  const status = invoiceMode || method === "paypal" || alreadyCleared ? "approved" : "pending";
+  const needsReview = status === "pending";
+
+  // On invoice terms the method fields are disabled in the browser, so they do
+  // not come back with the form at all. Writing them anyway would blank out
+  // details the publisher had already saved the moment they ticked the box, and
+  // lose them for good if they ticked it by mistake.
   await prisma.user.update({
     where: { id: user.id },
-    data: {
-      payMethod: String(formData.get("payMethod") || "").trim() || null,
-      payCountry: String(formData.get("payCountry") || "").trim() || null,
-      payBank: String(formData.get("payBank") || "").trim() || null,
-      payPaypal: String(formData.get("payPaypal") || "").trim() || null,
-      payMpesa: String(formData.get("payMpesa") || "").trim() || null,
-      payCard: String(formData.get("payCard") || "").trim() || null,
-    },
+    data: invoiceMode
+      ? { payInvoiceMode: true, payStatus: "approved", payNote: null }
+      : {
+          payMethod: method,
+          payCountry: String(formData.get("payCountry") || "").trim() || null,
+          payBank: bank || null,
+          payPaypal: paypal || null,
+          payMpesa: mpesa || null,
+          payCard: other || null,
+          payInvoiceMode: false,
+          payStatus: status,
+          payNote: needsReview ? null : me?.payNote || null,
+          payRequestedAt: needsReview ? new Date() : me?.payRequestedAt || null,
+        },
   });
-  redirect(first ? `/dashboard?success=${q("You're all set. Welcome aboard!")}` : `/payout?success=${q("Payment details saved.")}`);
+
+  if (needsReview && emailEnabled()) {
+    try {
+      await sendPayoutMethodRequestAdmin({
+        publisherName: user.name,
+        publisherEmail: user.email,
+        method,
+        details: method === "mpesa" ? mpesa : method === "bank" ? bank : other,
+      });
+    } catch (e: any) {
+      console.error(`[payout] could not notify admin of a payout method request: ${e?.message || e}`);
+    }
+  }
+
+  const saved = invoiceMode
+    ? "Saved. Attach an invoice each time you submit a live link and we will pay against it."
+    : needsReview
+      ? "Saved. We are checking whether we can pay you that way and will come back to you within 24 hours."
+      : "Payment details saved.";
+  redirect(first ? `/dashboard?success=${q(saved)}` : `/payout?success=${q(saved)}`);
 }
 
 /**

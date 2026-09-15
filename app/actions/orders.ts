@@ -172,16 +172,29 @@ export async function payWithStripeAction(formData: FormData) {
   redirect(url);
 }
 
-/** Publisher submits the live URL. */
+/**
+ * Publisher submits the live URL.
+ *
+ * A publisher on invoice terms holds no payment details on file, so the invoice
+ * has to arrive with the link. It is required here rather than chased later:
+ * once the buyer confirms, payment is due within 72 hours and there is no time
+ * to go looking for it.
+ */
 export async function submitLiveAction(formData: FormData) {
   const user = await requireRole("publisher");
   const orderId = parseInt(String(formData.get("orderId") || "0"));
   const liveUrl = String(formData.get("liveUrl") || "").trim();
+  const invoiceUrl = String(formData.get("invoiceUrl") || "").trim();
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { listing: true, buyer: true } });
   if (!order || order.listing.publisherId !== user.id) redirect(`/orders?error=${q("Not your order.")}`);
   if (!["funded", "in_progress"].includes(order!.status))
     redirect(`/orders/${orderId}?error=${q("Confirm you received the order first.")}`);
   if (!/^https?:\/\//.test(liveUrl)) redirect(`/orders/${orderId}?error=${q("Enter a valid live URL.")}`);
+
+  const me = await prisma.user.findUnique({ where: { id: user.id }, select: { payInvoiceMode: true } });
+  if (me?.payInvoiceMode && !/^https?:\/\//.test(invoiceUrl)) {
+    redirect(`/orders/${orderId}?error=${q("Add the link to your invoice. You chose to invoice for each placement rather than save payment details.")}`);
+  }
 
   // Delivered. Clear the deadline so the sweeper can never cancel an order
   // whose link is already up and waiting on the buyer to look at it.
@@ -191,7 +204,7 @@ export async function submitLiveAction(formData: FormData) {
   // update would put a refunded order back on the publisher-payment queue.
   const moved = await prisma.order.updateMany({
     where: { id: orderId, status: { in: ["funded", "in_progress"] } },
-    data: { status: "live", liveUrl, dueAt: null },
+    data: { status: "live", liveUrl, dueAt: null, invoiceUrl: invoiceUrl || null },
   });
   if (moved.count === 0) {
     redirect(`/orders/${orderId}?error=${q("This order is no longer open - it was cancelled or already completed. Please contact us before publishing anything further.")}`);

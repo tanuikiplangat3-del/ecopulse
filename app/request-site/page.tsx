@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { Flash } from "@/components/ui";
+import PopupMessage from "@/components/PopupMessage";
+import { one } from "@/lib/util";
 import { appUrl } from "@/lib/stripe";
 import { INVITE_DAYS, MAX_OPEN_INVITES } from "@/lib/invites";
 import {
@@ -51,6 +53,15 @@ export default async function RequestSitePage({
       </p>
       <Flash searchParams={searchParams} />
 
+      {one(searchParams.exists) && (
+        <PopupMessage
+          title="We already have this publisher"
+          body={`${one(searchParams.exists)} is already on Link Tomorrow. Contact us and we will look at it with you.`}
+          actionLabel="Contact us"
+          actionHref="mailto:hello@welcometomorrow.io?subject=About%20a%20publisher%20already%20on%20the%20platform"
+        />
+      )}
+
       <form action={createPublisherInviteAction} className="card">
         <label className="field">
           <span>Publisher&rsquo;s email</span>
@@ -71,8 +82,8 @@ export default async function RequestSitePage({
             <input className="input" name="publisherName" placeholder="Jane Doe" autoComplete="off" />
           </label>
           <label className="field mb-0">
-            <span>Their website <span className="muted">(optional)</span></span>
-            <input className="input" name="site" placeholder="konemedia.co.ke" autoComplete="off" />
+            <span>Their website</span>
+            <input className="input" name="site" placeholder="konemedia.co.ke" required autoComplete="off" />
           </label>
         </div>
 

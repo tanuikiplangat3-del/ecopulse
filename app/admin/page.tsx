@@ -21,6 +21,8 @@ export default async function AdminHome({
   ]);
   const siteRequests = await prisma.siteRequest.count({ where: { status: "pending" } });
   const conflicts = await countConflicts();
+  const simulated = await prisma.user.count({ where: { isSimulated: true } });
+  const payoutReviews = await prisma.user.count({ where: { role: "publisher", payStatus: "pending" } });
 
   const cards = [
     { href: "/admin/listings", label: "Review listings", value: pending, hint: "pending" },
@@ -29,6 +31,8 @@ export default async function AdminHome({
     { href: "/admin/site-requests", label: "Site requests", value: siteRequests, hint: "awaiting review" },
     { href: "/admin/invites", label: "Publisher invites", value: invites, hint: "open" },
     { href: "/admin/users", label: "Users", value: users, hint: `${publishers} publishers` },
+    { href: "/admin/simulated", label: "Simulated accounts", value: simulated, hint: "our own buyers" },
+    { href: "/admin/payouts", label: "Payout methods", value: payoutReviews, hint: "awaiting review" },
   ];
 
   return (
@@ -36,7 +40,7 @@ export default async function AdminHome({
       <h1 className="h2 mb-1">Admin</h1>
       <p className="muted mb-6">Manage the marketplace.</p>
       <Flash searchParams={searchParams} />
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => (
           <Link key={c.href} href={c.href} className="card hover:border-wt-green/50">
             <p className="muted text-sm">{c.label}</p>

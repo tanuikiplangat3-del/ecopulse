@@ -31,7 +31,7 @@ export default function ListingCard({
   locked?: boolean;
   // True only when this viewer is the buyer who brought us this publisher AND
   // still has reduced-rate orders left. Worked out in lib/requester.ts - never
-  // by comparing requestedById here, or the discount would never expire.
+  // by comparing requestedById here, so the rule stays in one file.
   requesterRate?: boolean;
 }) {
   const niches = listing.category.split(",").filter(Boolean).slice(0, 3);

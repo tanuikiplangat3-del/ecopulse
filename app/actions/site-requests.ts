@@ -114,8 +114,8 @@ export async function submitSiteRequestAction(formData: FormData) {
  * publisher they negotiated with. Whoever registers through it gets a real
  * publisher account, lists their own sites, and is paid like any other
  * publisher - and every site they list carries this buyer's negotiated rate:
- * half margin on that buyer's first 3 orders per site, standard margin for
- * everyone else.
+ * their negotiated commission for that buyer, standard margin for everyone
+ * else.
  *
  * The link is single-use and expires in 30 days. approveSiteRequestAction is
  * still there as the fallback for a publisher who will not sign up.
@@ -223,7 +223,7 @@ export async function approveSiteRequestAction(formData: FormData) {
 
   // The reduced rate is a reward for bringing us inventory we do not already
   // carry. If this domain is already on the marketplace, listing it as
-  // "requested" would let any buyer convert an existing site into a discounted
+  // "requested" would let any buyer convert an existing site into a cheaper
   // one for themselves - and, because the cheapest copy wins, take our own
   // listing off the marketplace in the process. So an already-listed domain is
   // created as an ordinary tiered listing at the negotiated price: everyone,
@@ -287,7 +287,7 @@ export async function approveSiteRequestAction(formData: FormData) {
   redirect(
     `/admin/site-requests?success=${q(
       isNewInventory
-        ? req!.domain + " approved and listed. The buyer gets their negotiated rate on their first 3 orders."
+        ? req!.domain + " approved and listed. The buyer gets their negotiated rate on it."
         : req!.domain + " is already on the marketplace, so it was NOT listed yet - it is waiting on Admin > Conflicts for you to compare the two prices. It also carries standard pricing rather than the discounted requester rate, because we already had this domain."
     )}`
   );

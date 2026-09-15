@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { money, buyerPrice, trafficShort } from "@/lib/money";
 import { linkTypeLabel } from "@/lib/data";
-import { requesterOrdersLeft } from "@/lib/requester";
+import { hasRequesterRate } from "@/lib/requester";
 import { placeOrderAction } from "@/app/actions/orders";
 import { Flash } from "@/components/ui";
 import { authorityFor } from "@/lib/authority";
@@ -43,10 +43,9 @@ export default async function ListingPage({
 
   const niches = listing.category.split(",").filter(Boolean);
 
-  // Buyer-requested sites: does this viewer still get the rate they negotiated,
-  // and how many of those orders are left?
-  const ordersLeft = await requesterOrdersLeft(user?.id, listing!);
-  const requesterRate = ordersLeft > 0;
+  // Did this viewer bring us this publisher? If so the site prices at the rate
+  // they negotiated. Nothing on the page says so - the price is simply lower.
+  const requesterRate = await hasRequesterRate(user?.id, listing!);
 
   return (
     <div className="grid gap-8 lg:grid-cols-3">

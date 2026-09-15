@@ -17,16 +17,24 @@ import { UNLOCK_DEPOSIT_CENTS, FREE_PREVIEW_COUNT } from "@/lib/money";
 export { FREE_PREVIEW_COUNT };
 
 /**
- * Total a user has actually paid in, in cents. Measured from successful Stripe
- * top-ups (the gross amount charged) rather than the wallet balance, so that
- * spending the balance afterwards never re-locks the marketplace.
+ * Total a user has paid in, in cents. Measured from successful Stripe top-ups
+ * (the gross amount charged) rather than the wallet balance, so that spending
+ * the balance afterwards never re-locks the marketplace.
+ *
+ * Simulated credits count too. A simulated account is meant to behave exactly
+ * like a paying buyer, and leaving them out would blur its own marketplace the
+ * moment it had more than FREE_PREVIEW_COUNT sites to look at. They are still
+ * reported separately everywhere money is totalled - see lib/simulated.ts.
  */
 export async function totalDepositedCents(userId: number): Promise<number> {
-  const agg = await prisma.stripeTx.aggregate({
-    where: { userId, purpose: "topup", status: "success" },
-    _sum: { amountCents: true },
-  });
-  return agg._sum.amountCents || 0;
+  const [card, simulated] = await Promise.all([
+    prisma.stripeTx.aggregate({
+      where: { userId, purpose: "topup", status: "success" },
+      _sum: { amountCents: true },
+    }),
+    prisma.simulatedCredit.aggregate({ where: { userId }, _sum: { grossCents: true } }),
+  ]);
+  return (card._sum.amountCents || 0) + (simulated._sum.grossCents || 0);
 }
 
 export type Viewer = {

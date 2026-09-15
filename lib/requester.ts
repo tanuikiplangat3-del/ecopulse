@@ -1,23 +1,22 @@
-// Who still gets the buyer-requested rate, and for how much longer.
+// Who pays the rate they negotiated, on the sites they brought us.
 //
-// A buyer who brought us a publisher pays half the normal margin - but only for
-// their first REQUESTER_ORDER_LIMIT orders on that listing. After that the site
-// prices normally for them too.
+// A buyer who brings us a publisher pays a flat commission on that publisher's
+// sites instead of the tiered margin - see broughtInFee() in lib/money.ts. It
+// applies to every order they place on those sites, for as long as they keep
+// buying. There is no longer an allowance that runs out.
 //
-// This is the ONLY place that decides it. Everywhere that shows or charges a
-// price must get `requesterRate` from here rather than comparing requestedById
-// itself, or the discount would never expire.
+// This is still the ONLY place that decides it. Everywhere that shows or
+// charges a price asks here rather than comparing requestedById itself, so the
+// rule lives in exactly one file if it ever changes again.
 
-import { prisma } from "@/lib/prisma";
-import { MARKUP_INVITED, MARKUP_REQUESTED, REQUESTER_ORDER_LIMIT } from "@/lib/money";
+import { MARKUP_INVITED, MARKUP_REQUESTED } from "@/lib/money";
 
 /**
- * The two models that give one buyer a reduced rate: a site we listed from
- * their request, and a site listed by a publisher who joined through their
- * link. The allowance works identically on both - REQUESTER_ORDER_LIMIT orders
- * per listing - so every check here asks for either.
+ * The two models that mean "this buyer brought us this publisher": a site we
+ * listed from their request, and a site listed by a publisher who registered
+ * through their link. Both price identically.
  */
-const REDUCED_RATE_MODELS = [MARKUP_REQUESTED, MARKUP_INVITED];
+const BROUGHT_IN_MODELS = [MARKUP_REQUESTED, MARKUP_INVITED];
 
 export type RequesterListing = {
   id: number;
@@ -25,12 +24,19 @@ export type RequesterListing = {
   requestedById?: number | null;
 };
 
-/** Cancelled orders never used up an allowance - nothing was ever paid. */
-const COUNTS_TOWARDS_LIMIT = { not: "cancelled" };
+/** Did this viewer bring us the publisher behind this listing? */
+function broughtInByViewer(viewerId: number | null | undefined, listing: RequesterListing): boolean {
+  if (!viewerId) return false;
+  return BROUGHT_IN_MODELS.includes(listing.markupModel || "") && listing.requestedById === viewerId;
+}
 
 /**
- * Of the listings given, which ones does this viewer still get their negotiated
- * rate on? One query for the whole page, so a marketplace grid stays cheap.
+ * Of the listings given, which ones price at this viewer's negotiated rate?
+ *
+ * Async on purpose. It used to count orders to see whether an allowance had run
+ * out; it no longer needs the database, but every caller awaits it and the
+ * signature is kept so the rule can go back to needing a query without touching
+ * the pages again.
  */
 export async function requesterRateListingIds(
   viewerId: number | null | undefined,
@@ -38,48 +44,16 @@ export async function requesterRateListingIds(
 ): Promise<Set<number>> {
   const allowed = new Set<number>();
   if (!viewerId) return allowed;
-
-  const mine = listings
-    .filter((l) => REDUCED_RATE_MODELS.includes(l.markupModel || "") && l.requestedById === viewerId)
-    .map((l) => l.id);
-  if (mine.length === 0) return allowed;
-
-  const orders = await prisma.order.findMany({
-    where: { listingId: { in: mine }, buyerId: viewerId, status: COUNTS_TOWARDS_LIMIT },
-    select: { listingId: true },
-  });
-
-  const used = new Map<number, number>();
-  for (const o of orders) used.set(o.listingId, (used.get(o.listingId) || 0) + 1);
-
-  for (const id of mine) {
-    if ((used.get(id) || 0) < REQUESTER_ORDER_LIMIT) allowed.add(id);
+  for (const l of listings) {
+    if (broughtInByViewer(viewerId, l)) allowed.add(l.id);
   }
   return allowed;
 }
 
-/** Does this viewer get the reduced rate on this one listing right now? */
+/** Does this viewer get their negotiated rate on this one listing? */
 export async function hasRequesterRate(
   viewerId: number | null | undefined,
   listing: RequesterListing
 ): Promise<boolean> {
-  const allowed = await requesterRateListingIds(viewerId, [listing]);
-  return allowed.has(listing.id);
-}
-
-/**
- * How many reduced-rate orders this viewer has left on this listing, so the
- * buyer can see the allowance running down instead of being surprised by a
- * price change. Returns 0 for anyone who is not the requester.
- */
-export async function requesterOrdersLeft(
-  viewerId: number | null | undefined,
-  listing: RequesterListing
-): Promise<number> {
-  if (!viewerId) return 0;
-  if (!REDUCED_RATE_MODELS.includes(listing.markupModel || "") || listing.requestedById !== viewerId) return 0;
-  const usedCount = await prisma.order.count({
-    where: { listingId: listing.id, buyerId: viewerId, status: COUNTS_TOWARDS_LIMIT },
-  });
-  return Math.max(0, REQUESTER_ORDER_LIMIT - usedCount);
+  return broughtInByViewer(viewerId, listing);
 }
