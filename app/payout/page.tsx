@@ -21,7 +21,10 @@ export default async function PayoutPage({
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="h2 mb-1">{first ? "Add your payment details" : "Payment details"}</h1>
-      <p className="muted mb-6">Tell us where to send your earnings. You can update this anytime.</p>
+      <p className="muted mb-6">
+        Tell us where to send your earnings. We pay by PayPal as standard. You can ask for another
+        method and we will confirm within 24 hours whether we can pay that way.
+      </p>
       <Flash searchParams={searchParams} />
 
       <div className="mb-5 flash flash-info">
@@ -33,9 +36,14 @@ export default async function PayoutPage({
       <form action={savePayoutAction} className="card">
         {first && <input type="hidden" name="first" value="1" />}
         <PayoutFields
-          method={me?.payMethod || "mpesa"}
+          method={me?.payMethod || "paypal"}
           mpesa={me?.payMpesa || ""}
           paypal={me?.payPaypal || ""}
+          bank={me?.payBank || ""}
+          other={me?.payCard || ""}
+          invoiceMode={!!me?.payInvoiceMode}
+          status={me?.payStatus || "approved"}
+          note={me?.payNote || ""}
         />
         <div className="field">
           <span>Country</span>
