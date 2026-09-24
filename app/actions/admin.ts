@@ -369,6 +369,11 @@ export async function markPublisherPaidAction(formData: FormData) {
   if (!order || !["live", "completed"].includes(order.status)) {
     redirect(`/admin/orders?error=${q("The link must be live before you can pay the publisher.")}`);
   }
+  // Part of a withdrawal request: pay it there, or the request total and the
+  // orders it covers would no longer agree.
+  if (order!.withdrawalId) {
+    redirect(`/admin/withdrawals?error=${q(`Order #${orderId} is in withdrawal #${order!.withdrawalId}. Pay or decline it here.`)}`);
+  }
   // Paying settles the order: mark paid and close it (releases the buyer's hold).
   await prisma.order.update({
     where: { id: orderId },

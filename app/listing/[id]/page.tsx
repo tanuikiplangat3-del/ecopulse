@@ -4,7 +4,7 @@ import { getViewerAccess, FREE_PREVIEW_COUNT } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { money, buyerPrice, trafficShort } from "@/lib/money";
-import { linkTypeLabel } from "@/lib/data";
+import { linkTypeLabel, CONTENT_TYPES } from "@/lib/data";
 import { hasRequesterRate } from "@/lib/requester";
 import { placeOrderAction } from "@/app/actions/orders";
 import { Flash } from "@/components/ui";
@@ -114,6 +114,22 @@ export default async function ListingPage({
           {user && user.role === "buyer" && (
             <form action={placeOrderAction} encType="multipart/form-data">
               <input type="hidden" name="listingId" value={listing.id} />
+              {/* Guest post or PR article. Same price either way; the publisher
+                  sees the choice on the order. */}
+              <div className="field">
+                <span>What are you sending?</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {CONTENT_TYPES.map((t, i) => (
+                    <label
+                      key={t.value}
+                      className="flex cursor-pointer items-center justify-center gap-2 rounded-sm border-2 border-white/20 px-3 py-3 text-[15px] font-bold has-[:checked]:border-wt-green has-[:checked]:bg-wt-green/15"
+                    >
+                      <input type="radio" name="contentType" value={t.value} defaultChecked={i === 0} className="accent-[#0AA865]" required />
+                      {t.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
               <label className="field">
                 <span>Your target URL</span>
                 <input className="input" name="targetUrl" placeholder="https://yoursite.com/page" required />
@@ -131,7 +147,7 @@ export default async function ListingPage({
                 </select>
               </label>
               <label className="field">
-                <span>Guest post document (Word / PDF)</span>
+                <span>Article document (Word / PDF)</span>
                 <input
                   className="input file:mr-3 file:rounded-sm file:border-0 file:bg-wt-green file:px-4 file:py-1.5 file:text-white"
                   type="file"

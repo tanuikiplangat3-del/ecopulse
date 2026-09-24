@@ -52,7 +52,10 @@ export default async function AdminOrders({ searchParams }: { searchParams: { [k
               {toPay.map((o) => (
                 <tr key={o.id}>
                   <td><Link href={`/orders/${o.id}`} className="text-wt-green">{o.id}</Link></td>
-                  <td className="font-semibold">{o.listing.domain}</td>
+                  <td className="font-semibold">
+                    {o.listing.domain}
+                    {o.contentType === "pr_article" && <span className="badge badge-yellow ml-2 align-middle">PR</span>}
+                  </td>
                   <td className="muted">{o.buyer.name}</td>
                   <td>
                     <Link href={`/admin/users/${o.listing.publisherId}`} className="text-wt-green hover:underline">
@@ -70,10 +73,14 @@ export default async function AdminOrders({ searchParams }: { searchParams: { [k
                           <button className="btn-ghost btn-sm" type="submit">Confirm live</button>
                         </form>
                       )}
-                      <form action={markPublisherPaidAction}>
-                        <input type="hidden" name="orderId" value={o.id} />
-                        <button className="btn-primary btn-sm" type="submit">Mark paid</button>
-                      </form>
+                      {o.withdrawalId ? (
+                        <Link href="/admin/withdrawals" className="btn-accent btn-sm">In withdrawal #{o.withdrawalId}</Link>
+                      ) : (
+                        <form action={markPublisherPaidAction}>
+                          <input type="hidden" name="orderId" value={o.id} />
+                          <button className="btn-primary btn-sm" type="submit">Mark paid</button>
+                        </form>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -97,7 +104,10 @@ export default async function AdminOrders({ searchParams }: { searchParams: { [k
               {inProgress.map((o) => (
                 <tr key={o.id}>
                   <td><Link href={`/orders/${o.id}`} className="text-wt-green">{o.id}</Link></td>
-                  <td className="font-semibold">{o.listing.domain}</td>
+                  <td className="font-semibold">
+                    {o.listing.domain}
+                    {o.contentType === "pr_article" && <span className="badge badge-yellow ml-2 align-middle">PR</span>}
+                  </td>
                   <td className="muted">{o.buyer.name}</td>
                   <td className="muted">{o.listing.publisher.name}</td>
                   <td>{money(o.amountCents)}</td>

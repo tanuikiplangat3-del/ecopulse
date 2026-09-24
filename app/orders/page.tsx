@@ -72,7 +72,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
               {orders.map((o) => (
                 <tr key={o.id}>
                   <td>{o.id}</td>
-                  <td className="font-semibold">{o.listing.domain}</td>
+                  <td className="font-semibold">
+                    {o.listing.domain}
+                    {o.contentType === "pr_article" && <span className="badge badge-yellow ml-2 align-middle">PR</span>}
+                  </td>
                   {user.role !== "buyer" && <td className="muted">{o.buyer.name}</td>}
                   <td>{money(user.role === "publisher" ? o.payoutCents : o.amountCents)}</td>
                   <td className="whitespace-nowrap">

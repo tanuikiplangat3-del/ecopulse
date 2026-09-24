@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, requireUser } from "@/lib/auth";
 import { buyerPrice, listingBaseCents, commissionRate, MARKUP_REQUESTED } from "@/lib/money";
 import { hasRequesterRate } from "@/lib/requester";
+import { isContentType } from "@/lib/data";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
 import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin, sendOrderConfirmedEmails, sendOrderCancelledEmails } from "@/lib/email";
 import {
@@ -51,6 +52,11 @@ export async function placeOrderAction(formData: FormData) {
   let tat = parseInt(String(formData.get("turnaroundDays") || "7"));
   if (![5, 7, 10].includes(tat)) tat = 7;
 
+  // Guest post or PR article. Anything unexpected falls back to a guest post,
+  // which is what every order was before the choice existed.
+  const rawType = String(formData.get("contentType") || "guest_post");
+  const contentType = isContentType(rawType) ? rawType : "guest_post";
+
   // Optional uploads (image up to 4MB, document up to 6MB), stored as data URLs.
   const doc = await readUpload(formData.get("articleDoc"), 6 * 1024 * 1024);
   if (doc === "too_big") redirect(`/listing/${listingId}?error=${q("Your document is larger than 6MB. Please upload a smaller file.")}`);
@@ -79,6 +85,7 @@ export async function placeOrderAction(formData: FormData) {
       articleDocName: doc ? doc.name : null,
       articleDocUrl: doc ? doc.url : null,
       turnaroundDays: tat,
+      contentType,
       amountCents: amount,
       payoutCents: payout,
       commissionRate: String(commissionRate()),
@@ -452,6 +459,7 @@ async function notifyPublisherFunded(orderId: number) {
       domain: order!.listing.domain,
       orderId,
       buyerName: order!.buyer?.name,
+      contentType: order!.contentType,
     });
   }
 }

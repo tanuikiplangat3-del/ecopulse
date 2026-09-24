@@ -28,8 +28,9 @@ export default async function PayoutPage({
       <Flash searchParams={searchParams} />
 
       <div className="mb-5 flash flash-info">
-        Payments are released within <strong>72 hours</strong> of the buyer confirming your link
-        is live. If a payment has not arrived within that window, contact seo@welcometomorrow.io
+        When a buyer confirms your link is live, the payout is ready to withdraw. Press{" "}
+        <strong>Withdraw</strong>, confirm your details, and we pay within <strong>72 hours</strong>.
+        If a payment has not arrived within that window, contact seo@welcometomorrow.io
         immediately and we will resolve it.
       </div>
 

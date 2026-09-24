@@ -23,6 +23,7 @@ export default async function AdminHome({
   const conflicts = await countConflicts();
   const simulated = await prisma.user.count({ where: { isSimulated: true } });
   const payoutReviews = await prisma.user.count({ where: { role: "publisher", payStatus: "pending" } });
+  const withdrawals = await prisma.withdrawal.count({ where: { status: "pending" } });
 
   const cards = [
     { href: "/admin/listings", label: "Review listings", value: pending, hint: "pending" },
@@ -32,6 +33,7 @@ export default async function AdminHome({
     { href: "/admin/invites", label: "Publisher invites", value: invites, hint: "open" },
     { href: "/admin/users", label: "Users", value: users, hint: `${publishers} publishers` },
     { href: "/admin/simulated", label: "Simulated accounts", value: simulated, hint: "our own buyers" },
+    { href: "/admin/withdrawals", label: "Withdrawals", value: withdrawals, hint: "to pay" },
     { href: "/admin/payouts", label: "Payout methods", value: payoutReviews, hint: "awaiting review" },
   ];
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { money } from "@/lib/money";
 import { Flash, StatusBadge } from "@/components/ui";
+import { publisherBalance } from "@/lib/withdrawals";
 
 export const metadata = { title: "Dashboard" };
 
@@ -91,25 +92,23 @@ async function BuyerDash({ userId, balance }: { userId: number; balance: number 
 }
 
 async function PublisherDash({ user }: { user: any }) {
-  const [sites, toFulfill, pendingAgg, paidAgg] = await Promise.all([
+  const [sites, toFulfill, bal] = await Promise.all([
     prisma.listing.count({ where: { publisherId: user.id } }),
     prisma.order.count({ where: { listing: { publisherId: user.id }, status: { in: ["funded", "in_progress", "live"] } } }),
-    // Owed to the publisher: delivered (live/completed) but not yet paid out.
-    prisma.order.aggregate({ _sum: { payoutCents: true }, where: { listing: { publisherId: user.id }, status: { in: ["live", "completed"] }, publisherPaid: false } }),
-    // Already paid out (resets to zero after the admin confirms each payment).
-    prisma.order.aggregate({ _sum: { payoutCents: true }, where: { listing: { publisherId: user.id }, publisherPaid: true } }),
+    // One definition of what can be withdrawn, shared with /withdraw and the
+    // action that makes the request. See lib/withdrawals.ts.
+    publisherBalance(user.id),
   ]);
-  const available = pendingAgg._sum.payoutCents || 0;
-  const paid = paidAgg._sum.payoutCents || 0;
-  const earned = available + paid;
+  const earned = bal.readyCents + bal.awaitingCents + bal.inReviewCents + bal.receivedCents;
   const hasPayout = !!(user.payMethod || user.payMpesa || user.payPaypal);
 
   return (
     <div>
       <div className="mb-5 flash flash-info">
-        Payments are released within <strong>72 hours</strong> of the buyer confirming your link
-        is live. If a payment has not arrived within that window, contact seo@welcometomorrow.io
-        immediately and we will resolve it.
+        When a buyer confirms your link is live, the payout is ready to withdraw. Press{" "}
+        <strong>Withdraw</strong>, confirm your payment details, and we pay within{" "}
+        <strong>72 hours</strong>. If a payment has not arrived within that window, contact
+        seo@welcometomorrow.io immediately and we will resolve it.
       </div>
 
       {!hasPayout && (
@@ -120,9 +119,26 @@ async function PublisherDash({ user }: { user: any }) {
       )}
 
       <div className="grid gap-5 md:grid-cols-3">
-        <div className="card"><p className="muted text-sm">Available (to be paid)</p><p className="text-3xl font-bold text-wt-green">{money(available)}</p><Link href="/payout" className="btn-ghost btn-sm mt-4">Payment details</Link></div>
-        <div className="card"><p className="muted text-sm">Total received</p><p className="text-3xl font-bold">{money(paid)}</p></div>
-        <div className="card"><p className="muted text-sm">Total earned</p><p className="text-3xl font-bold">{money(earned)}</p></div>
+        <div className="card">
+          <p className="muted text-sm">Ready to withdraw</p>
+          <p className="text-3xl font-bold text-wt-green">{money(bal.readyCents)}</p>
+          {bal.pending ? (
+            <p className="muted mt-4 text-xs">
+              {money(bal.pending.amountCents)} withdrawal in review.{" "}
+              <Link href="/withdraw" className="text-wt-green">View →</Link>
+            </p>
+          ) : bal.readyCents > 0 ? (
+            <Link href="/withdraw" className="btn-primary btn-sm mt-4">Withdraw</Link>
+          ) : (
+            <p className="muted mt-4 text-xs">
+              {bal.awaitingCents > 0
+                ? `${money(bal.awaitingCents)} waiting for buyers to confirm.`
+                : "Payouts appear here once a buyer confirms your link."}
+            </p>
+          )}
+        </div>
+        <div className="card"><p className="muted text-sm">Total received</p><p className="text-3xl font-bold">{money(bal.receivedCents)}</p><Link href="/withdraw" className="btn-ghost btn-sm mt-4">Withdrawal history</Link></div>
+        <div className="card"><p className="muted text-sm">Total earned</p><p className="text-3xl font-bold">{money(earned)}</p><Link href="/payout" className="btn-ghost btn-sm mt-4">Payment details</Link></div>
       </div>
 
       <div className="mt-5 grid gap-5 md:grid-cols-2">

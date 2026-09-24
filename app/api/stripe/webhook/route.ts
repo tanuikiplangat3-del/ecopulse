@@ -120,6 +120,7 @@ export async function POST(req: NextRequest) {
                     domain: full!.listing.domain,
                     orderId: tx.orderId,
                     buyerName: full!.buyer?.name,
+                    contentType: full!.contentType,
                   });
                 } else {
                   console.error(`[stripe-webhook] order ${tx.orderId} has no publisher - no order emails sent.`);

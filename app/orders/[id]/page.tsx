@@ -8,6 +8,7 @@ import { payFromWalletAction, payWithStripeAction, submitLiveAction, confirmLive
 import Countdown from "@/components/Countdown";
 import { MARKUP_REQUESTED } from "@/lib/money";
 import { stripeEnabled } from "@/lib/stripe";
+import { contentTypeLabel } from "@/lib/data";
 
 export default async function OrderPage({
   params,
@@ -38,6 +39,8 @@ export default async function OrderPage({
   const siteRequest = isAdmin && isRequested && order!.listing.siteRequestId
     ? await prisma.siteRequest.findUnique({ where: { id: order!.listing.siteRequestId } })
     : null;
+  // "guest post" / "PR article", for the publisher's reject wording.
+  const kindLower = order!.contentType === "pr_article" ? "PR article" : "guest post";
   const PAY_LABEL: Record<string, string> = {
     paypal: "PayPal", bank: "Bank transfer", mpesa: "M-Pesa", other: "Other",
   };
@@ -107,6 +110,7 @@ export default async function OrderPage({
         <h2 className="h3 mb-3">Details</h2>
         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           <Info label="Site" value={order!.listing.domain} />
+          <Info label="Article type" value={contentTypeLabel(order!.contentType)} />
           <Info label={isPublisher ? "Your payout" : "Amount"} value={money(isPublisher ? order!.payoutCents : order!.amountCents)} />
           <Info label="Target URL" value={order!.targetUrl || "-"} />
           <Info label="Anchor text" value={order!.anchorText || "-"} />
@@ -122,7 +126,7 @@ export default async function OrderPage({
             {order!.articleDocUrl && (
               <a
                 href={order!.articleDocUrl}
-                download={order!.articleDocName || "guest-post-document"}
+                download={order!.articleDocName || "article-document"}
                 className="btn-ghost btn-sm"
               >
                 ⬇ Download document{order!.articleDocName ? ` (${order!.articleDocName})` : ""}
@@ -218,7 +222,7 @@ export default async function OrderPage({
         <div className="card mt-5 border-white/10">
           <details>
             <summary className="cursor-pointer list-none text-sm font-semibold text-white/80">
-              Can&rsquo;t run this guest post? Reject it &rarr;
+              Can&rsquo;t run this {kindLower}? Reject it &rarr;
             </summary>
             <p className="muted mb-4 mt-3 text-sm">
               Rejecting ends the order and refunds the buyer in full. Please say why. The buyer
@@ -236,7 +240,7 @@ export default async function OrderPage({
                   placeholder="For example: the anchor text is for a niche we do not accept, or the article does not meet our editorial rules."
                 />
               </label>
-              <button className="btn-danger" type="submit">Reject guest post &amp; refund buyer</button>
+              <button className="btn-danger" type="submit">Reject {kindLower} &amp; refund buyer</button>
             </form>
           </details>
         </div>
