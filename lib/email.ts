@@ -127,14 +127,16 @@ export async function sendNewOrderEmails(input: {
   domain: string;
   orderId: number;
   buyerName?: string;
+  contentType?: string;
 }) {
   const { publisherEmail, domain, orderId } = input;
+  const kind = input.contentType === "pr_article" ? "PR article" : "guest post";
   await send(
     publisherEmail,
     `New order on ${domain}`,
     wrap(
       "You have a new order",
-      `<p>You have received a new order (#${orderId}) for a placement on <strong>${esc(domain)}</strong>.</p>
+      `<p>You have received a new order (#${orderId}) for a <strong>${kind}</strong> on <strong>${esc(domain)}</strong>.</p>
        <p>Sign in to your dashboard, open <strong>Orders</strong>, confirm you received it, then publish the link and submit the live URL.</p>`
     )
   );
@@ -143,7 +145,7 @@ export async function sendNewOrderEmails(input: {
     `New order #${orderId} on ${domain}`,
     wrap(
       "New order placed",
-      `<p>A new order (#${orderId}) was placed on <strong>${esc(domain)}</strong>${
+      `<p>A new ${kind} order (#${orderId}) was placed on <strong>${esc(domain)}</strong>${
         input.buyerName ? ` by ${esc(input.buyerName)}` : ""
       }.</p>
        <p>Follow up from the admin Orders page.</p>`
@@ -165,23 +167,25 @@ export async function sendOrderConfirmedEmails(input: {
   const { publisherEmail, domain, orderId, payoutCents } = input;
   await send(
     publisherEmail,
-    `Buyer confirmed order #${orderId} - payment on the way`,
+    `Buyer confirmed order #${orderId} - ready to withdraw`,
     wrap(
       "Your link was confirmed",
       `<p>The buyer has confirmed that your link on <strong>${esc(domain)}</strong> is live, and order
           <strong>#${orderId}</strong> is now complete.</p>
-       <p>Your payment of <strong>${money(payoutCents)}</strong> will be released within
-          <strong>72 hours</strong> to your saved payment details.</p>`
+       <p>Your payment of <strong>${money(payoutCents)}</strong> is now ready to withdraw. Sign in
+          and press <strong>Withdraw</strong> on your dashboard, confirm your payment details, and
+          we will pay you within <strong>72 hours</strong>.</p>`
     )
   );
   await send(
     ADMIN_NOTIFY,
-    `ACTION: release payment for order #${orderId} (${domain})`,
+    `Order #${orderId} confirmed (${domain}) - publisher can now withdraw`,
     wrap(
-      "Payment due within 72 hours",
+      "Order confirmed",
       `<p>The buyer confirmed order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong> is live.</p>
        <p>Publisher payout: <strong>${money(payoutCents)}</strong> to ${esc(publisherEmail)}.</p>
-       <p>The 72-hour payment window starts now. Release it from the admin Orders page.</p>`
+       <p>This is now ready for the publisher to withdraw. You will get a separate email when they
+          ask, and you pay it from the admin Withdrawals page.</p>`
     )
   );
 }
@@ -642,6 +646,64 @@ export function sendPayoutMethodDecision(input: {
            ${input.note ? `<p>${esc(input.note)}</p>` : ""}
            <p>Please open your payment details and choose another method. PayPal is the one we can
               always pay to.</p>`
+    )
+  );
+}
+
+/**
+ * A publisher pressed Withdraw. Their details are included so the admin can pay
+ * straight from the email, and the admin page is where it gets marked paid.
+ */
+export function sendWithdrawalRequestAdmin(input: {
+  withdrawalId: number;
+  publisherName: string;
+  publisherEmail: string;
+  amountCents: number;
+  orderCount: number;
+  method: string;
+  details: string;
+}) {
+  return send(
+    ADMIN_NOTIFY,
+    `ACTION: withdrawal #${input.withdrawalId} - ${money(input.amountCents)} to ${input.publisherName}`,
+    wrap(
+      "A publisher wants to be paid",
+      `<p><strong>${esc(input.publisherName)}</strong> (${esc(input.publisherEmail)}) has asked to
+          withdraw <strong>${money(input.amountCents)}</strong> for ${input.orderCount} completed
+          order${input.orderCount === 1 ? "" : "s"}.</p>
+       <p><strong>Pay by:</strong> ${esc(input.method)}<br>
+          <strong>Details:</strong><br>${esc(input.details)}</p>
+       <p>They have been told they will be paid within 72 hours. Once the money is sent, approve it
+          on the admin <strong>Withdrawals</strong> page, or decline it there with a reason.</p>`
+    ),
+    input.publisherEmail
+  );
+}
+
+/** The answer to a withdrawal request, in the publisher's inbox. */
+export function sendWithdrawalDecision(input: {
+  to: string;
+  approved: boolean;
+  amountCents: number;
+  method: string;
+  note: string;
+  reference: string;
+}) {
+  return send(
+    input.to,
+    input.approved ? `Your withdrawal of ${money(input.amountCents)} has been paid` : "About your withdrawal request",
+    wrap(
+      input.approved ? "Your withdrawal has been paid" : "We could not pay this withdrawal",
+      input.approved
+        ? `<p>We have sent <strong>${money(input.amountCents)}</strong> by <strong>${esc(input.method)}</strong>.</p>
+           ${input.reference ? `<p><strong>Payment reference:</strong> ${esc(input.reference)}</p>` : ""}
+           ${input.note ? `<p>${esc(input.note)}</p>` : ""}
+           <p>If it has not arrived within a few days, reply to this email and we will sort it out.</p>`
+        : `<p>Your request to withdraw <strong>${money(input.amountCents)}</strong> by
+              <strong>${esc(input.method)}</strong> was not approved.</p>
+           ${input.note ? `<p><strong>Reason:</strong> ${esc(input.note)}</p>` : ""}
+           <p>Your earnings are safe and are available to withdraw again. Sign in, check your
+              payment details, and press <strong>Withdraw</strong> on your dashboard.</p>`
     )
   );
 }

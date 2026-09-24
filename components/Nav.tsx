@@ -30,6 +30,7 @@ export default async function Nav() {
     items.push({ href: "/dashboard", label: "Dashboard" });
     if (u.role === "publisher") {
       items.push({ href: "/my-listings", label: "Websites" });
+      items.push({ href: "/withdraw", label: "Withdraw" });
       items.push({ href: "/payout", label: "Payment details" });
     }
     if (u.role === "buyer") {
@@ -47,12 +48,14 @@ export default async function Nav() {
   return (
     <header className="sticky top-0 z-50 bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px]">
       {/* Header geometry from the Figma menu component (node 1544:5188): an 84px
-          row with the logo at its full height and nav labels Outfit Bold 16px.
-          Stepped down on phones so the sticky bar does not eat the viewport. */}
+          row and nav labels Outfit Bold 16px. Logo 56px desktop / 40px phone:
+          Cosmas asked on 24 Sep 2026 for it a little smaller than the 62px it
+          had been. Stepped down on phones so the sticky bar does not eat the
+          viewport. */}
       <div className="container-wt relative flex h-[64px] items-center justify-between gap-4 md:h-[84px]">
         <Link href={homeHref} className="flex items-center" aria-label="Welcome Tomorrow">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO} alt="Welcome Tomorrow" className="h-[44px] w-auto md:h-[62px]" />
+          <img src={LOGO} alt="Welcome Tomorrow" className="h-[40px] w-auto md:h-[56px]" />
         </Link>
 
         {/* Desktop: everything inline. */}

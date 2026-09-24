@@ -286,6 +286,26 @@ export function linkTypeLabel(v: string): string {
 }
 
 /**
+ * What the buyer says they are sending, chosen per ORDER at checkout. This is
+ * separate from the listing's link type above: the same site can take a guest
+ * post from one buyer and a PR article from the next. The publisher sees the
+ * choice on the order, so a news site can label a PR piece as sponsored.
+ * Same price for both - a site cannot yet charge more for PR.
+ */
+export const CONTENT_TYPES = [
+  { value: "guest_post", label: "Guest post" },
+  { value: "pr_article", label: "PR article" },
+];
+
+export function contentTypeLabel(v: string | null | undefined): string {
+  return CONTENT_TYPES.find((t) => t.value === v)?.label || "Guest post";
+}
+
+export function isContentType(v: string): boolean {
+  return CONTENT_TYPES.some((t) => t.value === v);
+}
+
+/**
  * Prisma clause matching listings whose category list contains `niche` as a
  * WHOLE entry.
  *

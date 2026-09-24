@@ -71,6 +71,7 @@ model User {
   orders    Order[]    @relation("BuyerOrders")
   walletTx  WalletTx[]
   simulatedCredits SimulatedCredit[]
+  withdrawals Withdrawal[]
 }
 
 model Listing {
@@ -136,6 +137,8 @@ model Order {
   articleDocName String?  // uploaded guest-post document filename
   articleDocUrl  String?  // uploaded guest-post document (data URL)
   turnaroundDays Int      @default(7) // buyer-selected turnaround: 5 | 7 | 10
+  // What the buyer is sending: a guest post or a PR article. Chosen at checkout.
+  contentType    String   @default("guest_post") // guest_post | pr_article
   liveUrl        String?
   amountCents    Int      @default(0) // what the buyer pays
   payoutCents    Int      @default(0) // what the publisher receives
@@ -160,13 +163,45 @@ model Order {
   // keeping payment details on file.
   invoiceName    String?
   invoiceUrl     String?
+  // The withdrawal request this order's payout is part of. Set when the
+  // publisher presses Withdraw, cleared again if an admin declines it, so the
+  // same payout can never sit in two requests at once.
+  withdrawalId   Int?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([buyerId])
+  @@index([withdrawalId])
   @@index([listingId])
   @@index([status])
   @@index([dueAt])
+}
+
+// A publisher asking to be paid what they have earned.
+//
+// The publisher presses Withdraw, confirms where the money should go, and every
+// completed order not yet paid is attached to the request. An admin then either
+// pays it (the orders are marked paid) or declines it with a reason (the orders
+// are released so they can be asked for again). The payment details are copied
+// onto the request, so what the admin paid to stays on record even if the
+// publisher changes their saved details later.
+model Withdrawal {
+  id          Int       @id @default(autoincrement())
+  publisherId Int
+  publisher   User      @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  amountCents Int       @default(0)
+  method      String    @default("paypal") // paypal | mpesa | bank | other
+  details     String    @default("")
+  country     String?
+  status      String    @default("pending") // pending | paid | rejected
+  adminNote   String?   // shown to the publisher
+  reference   String?   // the admin's payment reference, e.g. a PayPal transaction id
+  decidedById Int?
+  decidedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([publisherId])
+  @@index([status])
 }
 
 model WalletTx {
