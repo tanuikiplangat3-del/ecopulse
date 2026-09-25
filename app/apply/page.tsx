@@ -15,11 +15,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ApplyPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function ApplyPage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   return (
     <div className="mx-auto max-w-xl">
       <span className="badge badge-green mb-4 inline-block">For publishers</span>

@@ -5,11 +5,12 @@ import { approveApplicationAction, rejectApplicationAction } from "@/app/actions
 
 export const metadata = { title: "Publisher requests" };
 
-export default async function AdminApplications({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function AdminApplications(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("admin");
   const apps = await prisma.publisherApplication.findMany({ orderBy: { createdAt: "desc" } });
 

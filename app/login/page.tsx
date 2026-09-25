@@ -3,7 +3,10 @@ import { loginAction } from "@/app/actions/auth";
 import { Flash } from "@/components/ui";
 import { PasswordInput } from "@/components/PasswordField";
 
-export default function LoginPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function LoginPage(
+  props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
+) {
+  const searchParams = await props.searchParams;
   return (
     <div className="mx-auto max-w-md">
       <div className="card">

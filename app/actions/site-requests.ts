@@ -1,5 +1,7 @@
 "use server";
 
+import { audit, formSummary } from "@/lib/audit";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
@@ -121,7 +123,8 @@ export async function submitSiteRequestAction(formData: FormData) {
  * still there as the fallback for a publisher who will not sign up.
  */
 export async function createPublisherLinkAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "createPublisherLinkAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   const req = await prisma.siteRequest.findUnique({ where: { id } });
   if (!req || !["pending", "invited"].includes(req.status))
@@ -209,7 +212,8 @@ async function externalPublisherId(): Promise<number> {
  * path.
  */
 export async function approveSiteRequestAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "approveSiteRequestAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   const req = await prisma.siteRequest.findUnique({ where: { id } });
   if (!req || !["pending", "invited"].includes(req.status))
@@ -295,7 +299,8 @@ export async function approveSiteRequestAction(formData: FormData) {
 
 /** Admin rejects a request, with an optional reason passed on to the buyer. */
 export async function rejectSiteRequestAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "rejectSiteRequestAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   const note = String(formData.get("note") || "").trim();
   const req = await prisma.siteRequest.findUnique({ where: { id } });

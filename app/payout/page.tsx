@@ -9,11 +9,12 @@ import { one } from "@/lib/util";
 
 export const metadata = { title: "Payment details" };
 
-export default async function PayoutPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function PayoutPage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireRole("publisher");
   const first = one(searchParams.first) === "1";
   const me = await prisma.user.findUnique({ where: { id: user.id } });

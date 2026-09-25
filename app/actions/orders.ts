@@ -8,6 +8,9 @@ import { requireRole, requireUser } from "@/lib/auth";
 import { buyerPrice, listingBaseCents, commissionRate, MARKUP_REQUESTED } from "@/lib/money";
 import { hasRequesterRate } from "@/lib/requester";
 import { isContentType } from "@/lib/data";
+import { audit, formSummary } from "@/lib/audit";
+import { safeHttpUrl, IMAGE_TYPES, DOCUMENT_TYPES } from "@/lib/safe-url";
+import { escHtml } from "@/lib/email";
 import { createCheckout, stripeEnabled } from "@/lib/stripe";
 import { emailEnabled, sendOrderNotice, sendNewOrderEmails, sendLiveUrlAdmin, sendOrderConfirmedEmails, sendOrderCancelledEmails } from "@/lib/email";
 import {
@@ -23,15 +26,21 @@ const q = (s: string) => encodeURIComponent(s);
 /** Read an uploaded file into a data URL, capped at maxBytes. Returns "too_big" if over. */
 async function readUpload(
   entry: FormDataEntryValue | null,
-  maxBytes: number
-): Promise<{ url: string; name: string } | "too_big" | null> {
+  maxBytes: number,
+  allowedTypes: string[]
+): Promise<{ url: string; name: string } | "too_big" | "bad_type" | null> {
   if (!entry || typeof entry === "string") return null;
   const file = entry as File;
   if (!file || file.size === 0) return null;
   if (file.size > maxBytes) return "too_big";
+  // The type is what the browser says, so it is only a first filter; the real
+  // protection is that uploads are only ever offered as downloads of these
+  // types (see lib/safe-url.ts), never opened as a page on our site.
+  const mime = (file.type || "").toLowerCase();
+  if (!allowedTypes.includes(mime)) return "bad_type";
   const buf = Buffer.from(await file.arrayBuffer());
-  const mime = file.type || "application/octet-stream";
-  return { url: `data:${mime};base64,${buf.toString("base64")}`, name: file.name };
+  const name = String(file.name || "file").replace(/[^\w.\- ]+/g, "_").slice(0, 120);
+  return { url: `data:${mime};base64,${buf.toString("base64")}`, name };
 }
 
 export async function placeOrderAction(formData: FormData) {
@@ -58,10 +67,12 @@ export async function placeOrderAction(formData: FormData) {
   const contentType = isContentType(rawType) ? rawType : "guest_post";
 
   // Optional uploads (image up to 4MB, document up to 6MB), stored as data URLs.
-  const doc = await readUpload(formData.get("articleDoc"), 6 * 1024 * 1024);
+  const doc = await readUpload(formData.get("articleDoc"), 6 * 1024 * 1024, DOCUMENT_TYPES);
   if (doc === "too_big") redirect(`/listing/${listingId}?error=${q("Your document is larger than 6MB. Please upload a smaller file.")}`);
-  const img = await readUpload(formData.get("featuredImageFile"), 4 * 1024 * 1024);
+  if (doc === "bad_type") redirect(`/listing/${listingId}?error=${q("The article must be a Word document, PDF, RTF or plain text file.")}`);
+  const img = await readUpload(formData.get("featuredImageFile"), 4 * 1024 * 1024, IMAGE_TYPES);
   if (img === "too_big") redirect(`/listing/${listingId}?error=${q("Your image is larger than 4MB. Please upload a smaller image.")}`);
+  if (img === "bad_type") redirect(`/listing/${listingId}?error=${q("The featured image must be a PNG, JPEG, WebP or GIF.")}`);
 
   // Requested sites are priced per buyer: the buyer who negotiated the deal pays
   // half the normal margin for their first few orders, everyone else pays the
@@ -81,7 +92,9 @@ export async function placeOrderAction(formData: FormData) {
       anchorText: String(formData.get("anchorText") || "").trim(),
       notes: String(formData.get("notes") || "").trim(),
       articleContent: String(formData.get("articleContent") || "").trim(),
-      featuredImage: img ? img.url : String(formData.get("featuredImage") || "").trim(),
+      // An uploaded image, or else an https link to one. Nothing else is stored:
+      // this value becomes a link on the publisher's and the admin's screen.
+      featuredImage: img ? img.url : safeHttpUrl(formData.get("featuredImage")) || "",
       articleDocName: doc ? doc.name : null,
       articleDocUrl: doc ? doc.url : null,
       turnaroundDays: tat,
@@ -190,8 +203,10 @@ export async function payWithStripeAction(formData: FormData) {
 export async function submitLiveAction(formData: FormData) {
   const user = await requireRole("publisher");
   const orderId = parseInt(String(formData.get("orderId") || "0"));
-  const liveUrl = String(formData.get("liveUrl") || "").trim();
-  const invoiceUrl = String(formData.get("invoiceUrl") || "").trim();
+  // Only real http(s) links are ever stored: they are shown as links to the
+  // buyer and the admin, and put into emails.
+  const liveUrl = safeHttpUrl(formData.get("liveUrl")) || "";
+  const invoiceUrl = safeHttpUrl(formData.get("invoiceUrl")) || "";
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { listing: true, buyer: true } });
   if (!order || order.listing.publisherId !== user.id) redirect(`/orders?error=${q("Not your order.")}`);
   if (!["funded", "in_progress"].includes(order!.status))
@@ -218,7 +233,7 @@ export async function submitLiveAction(formData: FormData) {
   }
   if (emailEnabled()) {
     if (order!.buyer) {
-      await sendOrderNotice(order!.buyer.email, "Your link is live", `The publisher submitted the live URL for order #${orderId}: ${liveUrl}. Please confirm in your dashboard.`);
+      await sendOrderNotice(order!.buyer.email, "Your link is live", `The publisher submitted the live URL for order #${orderId}: ${escHtml(liveUrl)}. Please confirm in your dashboard.`);
     }
     await sendLiveUrlAdmin(orderId, order!.listing.domain, liveUrl);
   }
@@ -235,7 +250,7 @@ export async function submitLiveAction(formData: FormData) {
 export async function buyerSubmitLiveAction(formData: FormData) {
   const user = await requireRole("buyer");
   const orderId = parseInt(String(formData.get("orderId") || "0"));
-  const liveUrl = String(formData.get("liveUrl") || "").trim();
+  const liveUrl = safeHttpUrl(formData.get("liveUrl")) || "";
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { listing: true },
@@ -280,6 +295,7 @@ export async function confirmLiveAction(formData: FormData) {
 export async function adminConfirmLiveAction(formData: FormData) {
   const user = await requireUser();
   if (user.role !== "admin") redirect(`/orders?error=${q("Admins only.")}`);
+  await audit(user, "adminConfirmLiveAction", null, formSummary(formData));
   const orderId = parseInt(String(formData.get("orderId") || "0"));
   const order = await prisma.order.findUnique({ where: { id: orderId }, include: { buyer: true } });
   if (!order || order.status !== "live") redirect(`/admin/orders?error=${q("Order is not awaiting confirmation.")}`);
@@ -306,6 +322,7 @@ export async function cancelOrderAction(formData: FormData) {
   const orderId = parseInt(String(formData.get("orderId") || "0"));
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) redirect(`/orders?error=${q("Order not found.")}`);
+  if (user.role === "admin") await audit(user, "cancelOrderAction", null, formSummary(formData));
   if (order.buyerId !== user.id && user.role !== "admin") {
     redirect(`/orders/${orderId}?error=${q("This is not your order.")}`);
   }
@@ -391,6 +408,7 @@ export async function publisherRejectOrderAction(formData: FormData) {
 export async function adminCancelOrderAction(formData: FormData) {
   const user = await requireUser();
   if (user.role !== "admin") redirect(`/orders?error=${q("Admins only.")}`);
+  await audit(user, "adminCancelOrderAction", null, formSummary(formData));
   const orderId = parseInt(String(formData.get("orderId") || "0"));
   const reason = String(formData.get("reason") || "").trim();
   const order = await prisma.order.findUnique({

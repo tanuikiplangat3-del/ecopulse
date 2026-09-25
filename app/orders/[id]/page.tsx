@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { safeDataUrl, featuredImageHref, DOCUMENT_TYPES } from "@/lib/safe-url";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
@@ -10,13 +11,14 @@ import { MARKUP_REQUESTED } from "@/lib/money";
 import { stripeEnabled } from "@/lib/stripe";
 import { contentTypeLabel } from "@/lib/data";
 
-export default async function OrderPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function OrderPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const user = await requireUser();
   const id = parseInt(params.id);
   const order = await prisma.order.findUnique({
@@ -39,6 +41,11 @@ export default async function OrderPage({
   const siteRequest = isAdmin && isRequested && order!.listing.siteRequestId
     ? await prisma.siteRequest.findUnique({ where: { id: order!.listing.siteRequestId } })
     : null;
+  // Uploaded files and links are only ever linked if they are what they claim
+  // to be. A stored value that is anything else (for example a javascript:
+  // link planted before this check existed) renders no link at all.
+  const docHref = safeDataUrl(order!.articleDocUrl, DOCUMENT_TYPES);
+  const imageHref = featuredImageHref(order!.featuredImage);
   // "guest post" / "PR article", for the publisher's reject wording.
   const kindLower = order!.contentType === "pr_article" ? "PR article" : "guest post";
   const PAY_LABEL: Record<string, string> = {
@@ -121,19 +128,19 @@ export default async function OrderPage({
           {isAdmin && <Info label="Publisher" value={order!.listing.publisher.name} />}
         </dl>
 
-        {(order!.articleDocUrl || order!.featuredImage) && (
+        {(docHref || imageHref) && (
           <div className="mt-4 flex flex-wrap gap-3">
-            {order!.articleDocUrl && (
+            {docHref && (
               <a
-                href={order!.articleDocUrl}
+                href={docHref}
                 download={order!.articleDocName || "article-document"}
                 className="btn-ghost btn-sm"
               >
                 ⬇ Download document{order!.articleDocName ? ` (${order!.articleDocName})` : ""}
               </a>
             )}
-            {order!.featuredImage && (
-              <a href={order!.featuredImage} download="featured-image" className="btn-ghost btn-sm">
+            {imageHref && (
+              <a href={imageHref} download="featured-image" target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">
                 ⬇ Download featured image
               </a>
             )}

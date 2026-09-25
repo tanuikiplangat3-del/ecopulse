@@ -9,7 +9,10 @@ import Countdown from "@/components/Countdown";
 
 export const metadata = { title: "Orders" };
 
-export default async function AdminOrders({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function AdminOrders(
+  props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("admin");
 
   const [toPay, inProgress] = await Promise.all([

@@ -3,7 +3,10 @@ import { registerAction } from "@/app/actions/auth";
 import { Flash } from "@/components/ui";
 import { NewPasswordFields } from "@/components/PasswordField";
 
-export default function RegisterPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function RegisterPage(
+  props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
+) {
+  const searchParams = await props.searchParams;
   return (
     <div className="mx-auto max-w-md">
       <div className="card">

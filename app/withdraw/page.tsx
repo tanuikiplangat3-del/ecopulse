@@ -13,11 +13,12 @@ import { requestWithdrawalAction } from "@/app/actions/withdrawals";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Withdraw" };
 
-export default async function WithdrawPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function WithdrawPage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireRole("publisher");
   const [me, bal, orders, history] = await Promise.all([
     prisma.user.findUnique({ where: { id: user.id } }),

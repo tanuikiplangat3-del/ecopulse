@@ -9,11 +9,12 @@ import { createSimulatedBuyerAction, creditSimulatedAction } from "@/app/actions
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Simulated accounts" };
 
-export default async function AdminSimulated({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function AdminSimulated(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("admin");
   const r = await simulatedReport();
 

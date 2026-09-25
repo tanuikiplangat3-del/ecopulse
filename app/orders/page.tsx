@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hrefOrNone } from "@/lib/safe-url";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { money } from "@/lib/money";
@@ -6,7 +7,10 @@ import { one } from "@/lib/util";
 import { StatusBadge, Flash, EmptyState } from "@/components/ui";
 import Countdown from "@/components/Countdown";
 
-export default async function OrdersPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function OrdersPage(
+  props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
   const f = one(searchParams.f);
 
@@ -86,7 +90,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                   <td><StatusBadge status={o.status} /></td>
                   <td>
                     {o.liveUrl ? (
-                      <a href={o.liveUrl} target="_blank" rel="noopener noreferrer" className="text-wt-green break-all hover:underline">{o.liveUrl}</a>
+                      <a href={hrefOrNone(o.liveUrl)} target="_blank" rel="noopener noreferrer" className="text-wt-green break-all hover:underline">{o.liveUrl}</a>
                     ) : (
                       <span className="muted">-</span>
                     )}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hrefOrNone } from "@/lib/safe-url";
 import { notFound, redirect } from "next/navigation";
 import { getViewerAccess, FREE_PREVIEW_COUNT } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
@@ -10,13 +11,14 @@ import { placeOrderAction } from "@/app/actions/orders";
 import { Flash } from "@/components/ui";
 import { authorityFor } from "@/lib/authority";
 
-export default async function ListingPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function ListingPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const id = parseInt(params.id);
   const listing = await prisma.listing.findUnique({ where: { id } });
   if (!listing || listing.status !== "approved") notFound();
@@ -55,7 +57,7 @@ export default async function ListingPage({
         <h1 className="h2 mb-1 mt-2 flex flex-wrap items-baseline gap-3">
           {listing.domain}
           <a
-            href={listing.url || `https://${listing.domain}`}
+            href={hrefOrNone(listing.url) || hrefOrNone(`https://${listing.domain}`)}
             target="_blank"
             rel="noopener noreferrer nofollow"
             className="text-sm font-semibold text-wt-green hover:underline"

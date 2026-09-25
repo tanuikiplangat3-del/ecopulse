@@ -2,7 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, verifyPassword, createSession, destroySession } from "@/lib/auth";
+import { hashPassword, verifyPassword, createSession, destroySession, revokeAllSessions } from "@/lib/auth";
+import { allow, clear, clientIp, LIMITS, TOO_MANY, sweepExpired } from "@/lib/rate-limit";
+import { createHash } from "crypto";
+import { audit } from "@/lib/audit";
 import {
   emailEnabled,
   sendVerificationCodeEmail,
@@ -10,6 +13,7 @@ import {
   sendPublisherWelcome,
   sendPublisherSignupAdmin,
   sendAdminSignupAdmin,
+  sendExistingAccountNotice,
 } from "@/lib/email";
 import { appUrl } from "@/lib/stripe";
 import { passwordProblem } from "@/lib/password";
@@ -18,6 +22,11 @@ import { randomBytes, randomInt } from "crypto";
 
 function q(s: string) {
   return encodeURIComponent(s);
+}
+
+/** Reset tokens are stored hashed, so a database leak does not hand out working reset links. */
+function tokenHash(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 /** A cryptographically random 6-digit code, always 6 characters. */
@@ -56,8 +65,24 @@ export async function registerAction(formData: FormData) {
   if (password !== confirmPassword)
     redirect(`/register?error=${q("Both passwords must match.")}`);
 
+  if (!(await allow([[`register:ip:${await clientIp()}`, LIMITS.registerPerIp]]))) {
+    redirect(`/register?error=${q(TOO_MANY)}`);
+  }
+
+  // An address that already has an account gets exactly the same screen as a
+  // new one, so this form cannot be used to find out who is registered. The
+  // real owner is emailed instead, in case it was them and they forgot.
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) redirect(`/register?error=${q("That email is already registered. Try signing in.")}`);
+  if (existing) {
+    if (emailEnabled()) {
+      try {
+        await sendExistingAccountNotice(email, `${appUrl()}/login`, `${appUrl()}/forgot-password`);
+      } catch (e: any) {
+        console.error(`[auth] could not send existing-account notice: ${e?.message || e}`);
+      }
+    }
+    redirect(`/verify-email?email=${q(email)}&success=${q("We sent a 6-digit code to " + email + ".")}`);
+  }
 
   const user = await prisma.user.create({
     data: {
@@ -102,10 +127,22 @@ export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
 
+  // Counted per address (so one account cannot be guessed at from many
+  // machines) and per IP (so one machine cannot work through many accounts).
+  const ip = await clientIp();
+  if (!(await allow([[`login:email:${email}`, LIMITS.loginPerEmail], [`login:ip:${ip}`, LIMITS.loginPerIp]]))) {
+    redirect(`/login?error=${q(TOO_MANY)}`);
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     redirect(`/login?error=${q("Wrong email or password.")}`);
   }
+  await clear(`login:email:${email}`);
+  // Admin sign-ins are recorded with the IP they came from.
+  if (user!.role === "admin") await audit(user!, "sign-in", null, `ip=${ip}`);
+  // Housekeeping: expired counters are dropped now and then.
+  if (Math.random() < 0.05) await sweepExpired();
   if (!user.verified) {
     // Send them a fresh code and take them straight to the confirm screen.
     if (emailEnabled()) await issueVerificationCode(user!.id, user!.email);
@@ -118,7 +155,7 @@ export async function loginAction(formData: FormData) {
 }
 
 export async function logoutAction() {
-  destroySession();
+  await destroySession();
   redirect("/");
 }
 
@@ -128,9 +165,13 @@ export async function verifyCodeAction(formData: FormData) {
   const code = String(formData.get("code") || "").replace(/\D/g, "");
   const back = `/verify-email?email=${q(email)}`;
 
+  if (!(await allow([[`code:email:${email}`, LIMITS.codePerEmail]]))) {
+    redirect(`${back}&error=${q(TOO_MANY)}`);
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) redirect(`${back}&error=${q("We could not find that account. Please sign up again.")}`);
-  if (user!.verified) redirect(`/login?success=${q("Your email is already confirmed. Please sign in.")}`);
+  if (!user) redirect(`${back}&error=${q("That code is not correct. Please check your email and try again.")}`);
+  if (user!.verified) redirect(`${back}&error=${q("That code is not correct. Please check your email and try again.")}`);
 
   const rec = await prisma.emailVerification.findFirst({
     where: { userId: user!.id },
@@ -166,6 +207,9 @@ export async function verifyCodeAction(formData: FormData) {
 export async function resendCodeAction(formData: FormData) {
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const back = `/verify-email?email=${q(email)}`;
+  if (!(await allow([[`resend:email:${email}`, LIMITS.resendPerEmail]]))) {
+    redirect(`${back}&error=${q(TOO_MANY)}`);
+  }
   const user = await prisma.user.findUnique({ where: { email } });
   // Never reveal whether the address exists.
   if (!user || user.verified) {
@@ -184,12 +228,16 @@ export async function resendCodeAction(formData: FormData) {
 
 export async function forgotAction(formData: FormData) {
   const email = String(formData.get("email") || "").trim().toLowerCase();
+  if (!(await allow([[`forgot:email:${email}`, LIMITS.forgotPerEmail], [`forgot:ip:${await clientIp()}`, LIMITS.forgotPerIp]]))) {
+    // Same message as success: a limit must not reveal whether the address exists.
+    redirect(`/login?success=${q("If that email exists, a reset link is on its way.")}`);
+  }
   const user = await prisma.user.findUnique({ where: { email } });
   if (user) {
     const token = randomBytes(24).toString("hex");
     await prisma.passwordReset.deleteMany({ where: { userId: user.id } });
     await prisma.passwordReset.create({
-      data: { token, userId: user.id, expiresAt: new Date(Date.now() + 3600_000) },
+      data: { token: tokenHash(token), userId: user.id, expiresAt: new Date(Date.now() + 3600_000) },
     });
     const link = `${appUrl()}/reset-password?token=${token}`;
     if (emailEnabled()) {
@@ -208,7 +256,10 @@ export async function forgotAction(formData: FormData) {
 export async function resetAction(formData: FormData) {
   const token = String(formData.get("token") || "");
   const password = String(formData.get("password") || "");
-  const pr = await prisma.passwordReset.findUnique({ where: { token } });
+  if (!(await allow([[`reset:ip:${await clientIp()}`, LIMITS.resetPerIp]]))) {
+    redirect(`/reset-password?token=${q(token)}&error=${q(TOO_MANY)}`);
+  }
+  const pr = token ? await prisma.passwordReset.findUnique({ where: { token: tokenHash(token) } }) : null;
   if (!pr || pr.expiresAt < new Date())
     redirect(`/reset-password?token=${q(token)}&error=${q("This reset link is invalid or has expired.")}`);
   const pwProblem = passwordProblem(password);
@@ -216,7 +267,10 @@ export async function resetAction(formData: FormData) {
   if (password !== String(formData.get("confirmPassword") || ""))
     redirect(`/reset-password?token=${q(token)}&error=${q("Both passwords must match.")}`);
   await prisma.user.update({ where: { id: pr!.userId }, data: { passwordHash: await hashPassword(password) } });
-  await prisma.passwordReset.delete({ where: { token } });
+  await prisma.passwordReset.deleteMany({ where: { userId: pr!.userId } });
+  // Whoever had this account open anywhere else, including someone who stole
+  // the old password, is signed out now.
+  await revokeAllSessions(pr!.userId);
   redirect(`/login?success=${q("Password updated. Please sign in.")}`);
 }
 
@@ -228,7 +282,10 @@ export async function acceptInviteAction(formData: FormData) {
 
   const sites = String(formData.get("sites") || "single");
   const agreedTuesday = String(formData.get("agreeTuesday") || "") === "on";
-  const invite = await prisma.invite.findUnique({ where: { token } });
+  if (!(await allow([[`invite:ip:${await clientIp()}`, LIMITS.invitePerIp]]))) {
+    redirect(`/accept-invite?token=${q(token)}&error=${q(TOO_MANY)}`);
+  }
+  const invite = token ? await prisma.invite.findUnique({ where: { token } }) : null;
   if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
     redirect(`/accept-invite?token=${q(token)}&error=${q("This invite is invalid or has expired.")}`);
   }

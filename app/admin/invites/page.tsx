@@ -4,7 +4,10 @@ import { Flash } from "@/components/ui";
 import { invitePublisherAction, revokeInviteAction, createShareInviteAction, inviteAdminAction } from "@/app/actions/admin";
 import { emailEnabled } from "@/lib/email";
 
-export default async function AdminInvites({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function AdminInvites(
+  props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("admin");
   const invites = await prisma.invite.findMany({ orderBy: { createdAt: "desc" } });
   // Links a BUYER generated for a publisher they negotiated with. Whoever signs

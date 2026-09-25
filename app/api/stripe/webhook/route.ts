@@ -49,11 +49,25 @@ export async function POST(req: NextRequest) {
       else if (amount !== tx.amountCents) console.error(`[stripe-webhook] ref ${ref} amount was ${amount}, expected ${tx.amountCents} - skipping.`);
 
       // Idempotent + server-side re-check of amount & currency.
-      if (tx && tx.status === "pending" && currency === "usd" && amount === tx.amountCents) {
-        await prisma.stripeTx.update({
-          where: { ref },
-          data: { status: "success", providerId: String(session.id) },
-        });
+      // Claim the transaction with a guarded write. Stripe can deliver the same
+      // event twice at the same moment; both would pass the read above, and
+      // without this guard both would credit the wallet. Only the delivery
+      // whose write actually flips pending -> success carries on.
+      const payable = !!tx && tx.status === "pending" && currency === "usd" && amount === tx.amountCents;
+      const claimed =
+        payable
+          ? (
+              await prisma.stripeTx.updateMany({
+                where: { ref, status: "pending" },
+                data: { status: "success", providerId: String(session.id) },
+              })
+            ).count === 1
+          : false;
+      if (payable && !claimed) {
+        console.log(`[stripe-webhook] ref ${ref} was claimed by a parallel delivery - skipping.`);
+      }
+
+      if (tx && claimed) {
 
         if (tx.purpose === "order" && tx.orderId) {
           const order = await prisma.order.findUnique({ where: { id: tx.orderId } });

@@ -8,11 +8,12 @@ import AuthorityField from "@/components/AuthorityField";
 
 export const metadata = { title: "Add a website" };
 
-export default async function NewListingPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function NewListingPage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("publisher");
   const first = one(searchParams.first) === "1";
 

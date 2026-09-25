@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import * as XLSX from "xlsx";
+import { readSpreadsheet, SpreadsheetError } from "@/lib/spreadsheet";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { centsFromUsd, money, MARKUP_TIERED, MARKUP_INVITED } from "@/lib/money";
@@ -189,14 +189,13 @@ export async function bulkUploadAction(formData: FormData) {
   if (!file || file.size === 0) redirect(`/bulk-upload?error=${q("Please choose a spreadsheet to upload.")}${first ? "&first=1" : ""}`);
 
   let rows: Record<string, any>[] = [];
+  let readError = "";
   try {
-    const buf = Buffer.from(await file!.arrayBuffer());
-    const wb = XLSX.read(buf, { type: "buffer" });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-  } catch {
-    redirect(`/bulk-upload?error=${q("Could not read that file. Use the CSV or Excel template.")}${first ? "&first=1" : ""}`);
+    rows = await readSpreadsheet(file!);
+  } catch (e: any) {
+    readError = e instanceof SpreadsheetError ? e.message : "Could not read that file. Use the CSV or Excel (.xlsx) template.";
   }
+  if (readError) redirect(`/bulk-upload?error=${q(readError)}${first ? "&first=1" : ""}`);
 
   const get = (row: Record<string, any>, keys: string[]) => {
     const lower: Record<string, any> = {};

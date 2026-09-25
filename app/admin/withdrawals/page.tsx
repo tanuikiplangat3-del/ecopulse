@@ -11,11 +11,12 @@ import { contentTypeLabel } from "@/lib/data";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Withdrawals" };
 
-export default async function AdminWithdrawals({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function AdminWithdrawals(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("admin");
 
   const [pending, decided] = await Promise.all([

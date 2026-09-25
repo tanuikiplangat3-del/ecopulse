@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { audit, formSummary } from "@/lib/audit";
 import { appUrl } from "@/lib/stripe";
 import {
   emailEnabled,
@@ -24,7 +25,8 @@ import { STATUS_ARCHIVED } from "@/lib/duplicates";
 const q = (s: string) => encodeURIComponent(s);
 
 export async function invitePublisherAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "invitePublisherAction", null, formSummary(formData));
   const email = String(formData.get("email") || "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     redirect(`/admin/invites?error=${q("Enter a valid email address.")}`);
@@ -48,7 +50,8 @@ export async function invitePublisherAction(formData: FormData) {
 
 /** Create a shareable publisher invite link (not tied to a specific email). */
 export async function createShareInviteAction() {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "createShareInviteAction", null, formSummary(null));
   const token = randomBytes(24).toString("hex");
   await prisma.invite.create({
     data: { email: null, token, role: "publisher", expiresAt: new Date(Date.now() + 7 * 86400_000) },
@@ -62,7 +65,8 @@ export async function createShareInviteAction() {
  * always tied to one address and are never shareable links.
  */
 export async function inviteAdminAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "inviteAdminAction", null, formSummary(formData));
   const email = String(formData.get("email") || "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     redirect(`/admin/invites?error=${q("Enter a valid email address for the new admin.")}`);
@@ -84,14 +88,16 @@ export async function inviteAdminAction(formData: FormData) {
 }
 
 export async function revokeInviteAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "revokeInviteAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   await prisma.invite.deleteMany({ where: { id, acceptedAt: null } });
   redirect(`/admin/invites?success=${q("Invite revoked.")}`);
 }
 
 export async function approveListingAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "approveListingAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   await prisma.listing.update({ where: { id }, data: { status: "approved" } });
   revalidatePath("/admin/listings");
@@ -100,7 +106,8 @@ export async function approveListingAction(formData: FormData) {
 }
 
 export async function rejectListingAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "rejectListingAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   await prisma.listing.update({ where: { id }, data: { status: "rejected" } });
   revalidatePath("/admin/listings");
@@ -108,7 +115,8 @@ export async function rejectListingAction(formData: FormData) {
 }
 
 export async function approveAllListingsAction() {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "approveAllListingsAction", null, formSummary(null));
   await prisma.listing.updateMany({ where: { status: "pending" }, data: { status: "approved" } });
   revalidatePath("/admin/listings");
   revalidatePath("/marketplace");
@@ -124,7 +132,8 @@ export async function approveAllListingsAction() {
  * One batch per click, so the request never outlives the load balancer.
  */
 export async function refreshListingMetricsAction() {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "refreshListingMetricsAction", null, formSummary(null));
   if (!ahrefsEnabled()) {
     redirect(`/admin/listings?error=${q("The Ahrefs API key is not set on the server, so DR cannot be fetched.")}`);
   }
@@ -152,7 +161,8 @@ export async function refreshListingMetricsAction() {
  * here is the quickest way to see why nothing is arriving.
  */
 export async function sendTestEmailAction() {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "sendTestEmailAction", null, formSummary(null));
   if (!emailEnabled()) {
     redirect(`/admin?error=${q("RESEND_API_KEY is not set on the server, so no email can be sent.")}`);
   }
@@ -176,7 +186,8 @@ export async function sendTestEmailAction() {
  * Guarded by typing DELETE, because there is no undo.
  */
 export async function deletePublisherListingsAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "deletePublisherListingsAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   const back = `/admin/users/${id}`;
   const pub = await prisma.user.findUnique({ where: { id } });
@@ -235,7 +246,8 @@ export async function deletePublisherListingsAction(formData: FormData) {
  * every distinct country value and rewrites the ones it recognises.
  */
 export async function normalizeListingCountriesAction() {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "normalizeListingCountriesAction", null, formSummary(null));
   const listings = await prisma.listing.findMany({ select: { country: true } });
 
   const counts = new Map<string, number>();
@@ -282,6 +294,7 @@ export async function normalizeListingCountriesAction() {
 /** Super admin: permanently delete any user (and their sites/orders via cascade). */
 export async function deleteUserAction(formData: FormData) {
   const me = await requireRole("admin");
+  await audit(me, "deleteUserAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   if (id === me.id) redirect(`/admin/users?error=${q("You cannot delete your own account.")}`);
   const target = await prisma.user.findUnique({ where: { id } });
@@ -327,7 +340,8 @@ export async function deleteUserAction(formData: FormData) {
 
 /** Approve a publisher request: create an invite and email them the sign-up link. */
 export async function approveApplicationAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "approveApplicationAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   const app = await prisma.publisherApplication.findUnique({ where: { id } });
   if (!app) redirect(`/admin/applications?error=${q("Request not found.")}`);
@@ -351,7 +365,8 @@ export async function approveApplicationAction(formData: FormData) {
 
 /** Reject a publisher request: email the applicant with an optional note. */
 export async function rejectApplicationAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "rejectApplicationAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   const note = String(formData.get("note") || "").trim();
   const app = await prisma.publisherApplication.findUnique({ where: { id } });
@@ -363,7 +378,8 @@ export async function rejectApplicationAction(formData: FormData) {
 }
 
 export async function markPublisherPaidAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "markPublisherPaidAction", null, formSummary(formData));
   const orderId = parseInt(String(formData.get("orderId") || "0"));
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order || !["live", "completed"].includes(order.status)) {

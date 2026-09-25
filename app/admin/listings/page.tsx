@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { hrefOrNone } from "@/lib/safe-url";
 import { requireRole } from "@/lib/auth";
 import { money, trafficShort } from "@/lib/money";
 import { StatusBadge, Flash } from "@/components/ui";
@@ -9,7 +10,10 @@ import { countConflicts } from "@/lib/duplicates";
 import Link from "next/link";
 import { authorityFor, isClaimedAuthority } from "@/lib/authority";
 
-export default async function AdminListings({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function AdminListings(
+  props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("admin");
   const listings = await prisma.listing.findMany({ include: { publisher: true }, orderBy: [{ status: "asc" }, { createdAt: "desc" }] });
   const conflictCount = await countConflicts();
@@ -82,7 +86,7 @@ export default async function AdminListings({ searchParams }: { searchParams: { 
             {listings.map((l) => (
               <tr key={l.id}>
                 <td className="font-semibold">
-                  <a href={l.url || `https://${l.domain}`} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-wt-green hover:underline">
+                  <a href={hrefOrNone(l.url) || hrefOrNone(`https://${l.domain}`)} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-wt-green hover:underline">
                     {l.domain} ↗
                   </a>
                   <div className="muted text-xs">

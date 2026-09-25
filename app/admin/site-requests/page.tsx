@@ -15,11 +15,12 @@ const PAY_LABEL: Record<string, string> = {
   other: "Other",
 };
 
-export default async function AdminSiteRequests({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function AdminSiteRequests(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("admin");
   const requests = await prisma.siteRequest.findMany({ orderBy: [{ status: "asc" }, { createdAt: "desc" }] });
   const buyerIds = Array.from(new Set(requests.map((r: any) => r.buyerId)));

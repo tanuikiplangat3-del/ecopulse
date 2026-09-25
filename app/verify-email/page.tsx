@@ -5,11 +5,12 @@ import { one } from "@/lib/util";
 
 export const metadata = { title: "Confirm your email", robots: { index: false } };
 
-export default function VerifyEmailPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function VerifyEmailPage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const email = one(searchParams.email);
 
   return (

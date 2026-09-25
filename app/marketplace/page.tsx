@@ -20,11 +20,12 @@ export const metadata = {
     "Browse vetted African publisher sites and acquire quality backlinks and guest posts.",
 };
 
-export default async function MarketplacePage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function MarketplacePage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser();
   if (user?.role === "publisher") redirect("/dashboard");
   const qStr = one(searchParams.q).trim();

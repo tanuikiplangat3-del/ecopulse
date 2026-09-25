@@ -6,11 +6,12 @@ import { one } from "@/lib/util";
 
 export const metadata = { title: "Publisher invite", robots: { index: false } };
 
-export default async function AcceptInvitePage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function AcceptInvitePage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const token = one(searchParams.token);
   const invite = token ? await prisma.invite.findUnique({ where: { token } }) : null;
   const valid = invite && !invite.acceptedAt && invite.expiresAt > new Date();

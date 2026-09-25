@@ -1,5 +1,7 @@
 "use server";
 
+import { audit, formSummary } from "@/lib/audit";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
@@ -31,7 +33,8 @@ const back = "/admin/users";
  * Admin -> Users.
  */
 export async function resetDemoDataAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "resetDemoDataAction", null, formSummary(formData));
   const password = String(formData.get("demoPassword") || "");
   const problem = passwordProblem(password);
   if (problem) redirect(`${back}?error=${q("Demo password: " + problem)}`);

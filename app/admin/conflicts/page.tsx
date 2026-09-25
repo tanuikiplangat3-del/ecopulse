@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hrefOrNone } from "@/lib/safe-url";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { money, buyerPrice, trafficShort, MARKUP_REQUESTED } from "@/lib/money";
@@ -19,11 +20,12 @@ type Row = {
   current: any | null;
 };
 
-export default async function AdminConflicts({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function AdminConflicts(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("admin");
   const conflicts = await pendingConflicts();
 
@@ -97,7 +99,7 @@ export default async function AdminConflicts({
                   <div>
                     <p className="text-lg font-bold">
                       <a
-                        href={incoming.url || `https://${incoming.domain}`}
+                        href={hrefOrNone(incoming.url) || hrefOrNone(`https://${incoming.domain}`)}
                         target="_blank"
                         rel="noopener noreferrer nofollow"
                         className="hover:text-wt-green hover:underline"

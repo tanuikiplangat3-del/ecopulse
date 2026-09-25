@@ -6,11 +6,12 @@ import { one } from "@/lib/util";
 
 export const metadata = { title: "Upload websites" };
 
-export default async function BulkUploadPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function BulkUploadPage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("publisher");
   const first = one(searchParams.first) === "1";
 
@@ -62,7 +63,7 @@ export default async function BulkUploadPage({
         {first && <input type="hidden" name="first" value="1" />}
         <label className="field">
           <span>Choose your file (.csv or .xlsx)</span>
-          <input className="input" type="file" name="file" accept=".csv,.xlsx,.xls" required />
+          <input className="input" type="file" name="file" accept=".csv,.xlsx" required />
         </label>
         <button className="btn-primary" type="submit">Upload websites</button>
       </form>

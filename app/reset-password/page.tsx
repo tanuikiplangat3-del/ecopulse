@@ -3,7 +3,10 @@ import { Flash } from "@/components/ui";
 import { NewPasswordFields } from "@/components/PasswordField";
 import { one } from "@/lib/util";
 
-export default function ResetPasswordPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function ResetPasswordPage(
+  props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
+) {
+  const searchParams = await props.searchParams;
   const token = one(searchParams.token);
   return (
     <div className="mx-auto max-w-md">

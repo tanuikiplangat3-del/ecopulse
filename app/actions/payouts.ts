@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { audit, formSummary } from "@/lib/audit";
 import { emailEnabled, sendPayoutMethodDecision } from "@/lib/email";
 
 const q = (s: string) => encodeURIComponent(s);
@@ -18,7 +19,8 @@ const back = "/admin/payouts";
  * what was turned down and change one thing rather than start again.
  */
 export async function decidePayoutMethodAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "decidePayoutMethodAction", null, formSummary(formData));
   const userId = parseInt(String(formData.get("userId") || "0")) || 0;
   const decision = String(formData.get("decision") || "");
   const note = String(formData.get("note") || "").trim();

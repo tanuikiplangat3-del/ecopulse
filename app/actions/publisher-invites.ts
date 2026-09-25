@@ -9,6 +9,7 @@ import { appUrl } from "@/lib/stripe";
 import { emailEnabled, sendPublisherInviteFromBuyer, sendBuyerTheirPublisherLink } from "@/lib/email";
 import { INVITE_DAYS, MAX_OPEN_INVITES, MAX_TOTAL_INVITES } from "@/lib/invites";
 import { domainOnPlatform, normalizeDomain } from "@/lib/duplicates";
+import { allow, LIMITS, TOO_MANY } from "@/lib/rate-limit";
 
 const q = (s: string) => encodeURIComponent(s);
 const back = "/request-site";
@@ -39,6 +40,12 @@ export async function createPublisherInviteAction(formData: FormData) {
   }
   if (email === user.email.trim().toLowerCase()) {
     redirect(`${back}?error=${q("That is your own email address. The link is for the publisher you negotiated with.")}`);
+  }
+
+  // Each link sends an email from our address to whoever the buyer names, so
+  // how many a buyer can send in a day is capped, whatever else happens.
+  if (!(await allow([[`publisher-link:buyer:${user.id}`, LIMITS.publisherLinkPerBuyer]]))) {
+    redirect(`${back}?error=${q("You have sent a lot of publisher links today. Please try again tomorrow, or email hello@welcometomorrow.io.")}`);
   }
 
   const domain = normalizeDomain(site);

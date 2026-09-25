@@ -13,11 +13,12 @@ import {
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Invite publisher" };
 
-export default async function RequestSitePage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function RequestSitePage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireRole("buyer");
   const base = appUrl();
   const mine = { requestedById: user.id, siteRequestId: null };

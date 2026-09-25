@@ -15,11 +15,12 @@ function detailsOf(u: any): string {
   return u.payCard || "";
 }
 
-export default async function AdminPayouts({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function AdminPayouts(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole("admin");
 
   const [pending, decided] = await Promise.all([

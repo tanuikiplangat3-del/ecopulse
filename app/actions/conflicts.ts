@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { audit, formSummary } from "@/lib/audit";
 import { money } from "@/lib/money";
 import {
   STATUS_CONFLICT,
@@ -23,7 +24,8 @@ const BACK = "/admin/conflicts";
  * The rejected listing keeps its record, so the publisher can see the outcome.
  */
 export async function keepCurrentListingAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "keepCurrentListingAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   const incoming = await prisma.listing.findUnique({
     where: { id },
@@ -60,7 +62,8 @@ export async function keepCurrentListingAction(formData: FormData) {
  * The old listing is archived, never deleted - its order history must survive.
  */
 export async function switchToNewListingAction(formData: FormData) {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "switchToNewListingAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("id") || "0"));
   const incoming = await prisma.listing.findUnique({
     where: { id },
@@ -106,7 +109,8 @@ export async function switchToNewListingAction(formData: FormData) {
  * time is not a good use of anyone's morning.
  */
 export async function resolveAllCheapestAction() {
-  await requireRole("admin");
+  const auditAdmin = await requireRole("admin");
+  await audit(auditAdmin, "resolveAllCheapestAction", null, formSummary(null));
   const conflicts = await pendingConflicts();
   if (conflicts.length === 0)
     redirect(`${BACK}?error=${q("There are no conflicts to resolve.")}`);

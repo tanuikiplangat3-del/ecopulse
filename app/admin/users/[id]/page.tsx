@@ -9,13 +9,14 @@ import { authorityFor, isClaimedAuthority } from "@/lib/authority";
 
 export const metadata = { title: "Publisher" };
 
-export default async function AdminPublisherPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function AdminPublisherPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireRole("admin");
   const id = parseInt(params.id);
   const pub = await prisma.user.findUnique({ where: { id } });

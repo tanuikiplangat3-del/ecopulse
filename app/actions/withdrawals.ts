@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { audit, formSummary } from "@/lib/audit";
 import { emailEnabled, sendWithdrawalRequestAdmin, sendWithdrawalDecision } from "@/lib/email";
 import {
   readyToWithdrawWhere,
@@ -88,6 +89,7 @@ export async function requestWithdrawalAction(formData: FormData) {
  */
 export async function decideWithdrawalAction(formData: FormData) {
   const admin = await requireRole("admin");
+  await audit(admin, "decideWithdrawalAction", null, formSummary(formData));
   const id = parseInt(String(formData.get("withdrawalId") || "0")) || 0;
   const decision = String(formData.get("decision") || "");
   const note = String(formData.get("note") || "").trim();

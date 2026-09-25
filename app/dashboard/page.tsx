@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hrefOrNone } from "@/lib/safe-url";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { money } from "@/lib/money";
@@ -7,11 +8,12 @@ import { publisherBalance } from "@/lib/withdrawals";
 
 export const metadata = { title: "Dashboard" };
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function DashboardPage(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   return (
@@ -75,7 +77,7 @@ async function BuyerDash({ userId, balance }: { userId: number; balance: number 
                   <td><StatusBadge status={o.status} /></td>
                   <td>
                     {o.liveUrl ? (
-                      <a href={o.liveUrl} target="_blank" rel="noopener noreferrer" className="text-wt-green break-all hover:underline">{o.liveUrl}</a>
+                      <a href={hrefOrNone(o.liveUrl)} target="_blank" rel="noopener noreferrer" className="text-wt-green break-all hover:underline">{o.liveUrl}</a>
                     ) : (
                       <span className="muted">-</span>
                     )}

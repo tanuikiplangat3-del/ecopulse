@@ -1,5 +1,7 @@
 "use server";
 
+import { audit, formSummary } from "@/lib/audit";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
@@ -27,6 +29,7 @@ const back = "/admin/simulated";
  */
 export async function createSimulatedBuyerAction(formData: FormData) {
   const admin = await requireRole("admin");
+  await audit(admin, "createSimulatedBuyerAction", null, formSummary(formData));
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
@@ -72,6 +75,7 @@ export async function createSimulatedBuyerAction(formData: FormData) {
 /** Add simulated balance to an existing simulated account. */
 export async function creditSimulatedAction(formData: FormData) {
   const admin = await requireRole("admin");
+  await audit(admin, "creditSimulatedAction", null, formSummary(formData));
   const userId = parseInt(String(formData.get("userId") || "0")) || 0;
   const amountUsd = parseFloat(String(formData.get("amount") || "0")) || 0;
   const note = String(formData.get("note") || "").trim();

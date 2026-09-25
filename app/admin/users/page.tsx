@@ -10,11 +10,12 @@ import { DEMO_BUYER_EMAIL, DEMO_PUBLISHER_EMAIL, DEMO_SITES } from "@/lib/demo";
 
 export const metadata = { title: "Users" };
 
-export default async function AdminUsers({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function AdminUsers(
+  props: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const me = await requireRole("admin");
   const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
 

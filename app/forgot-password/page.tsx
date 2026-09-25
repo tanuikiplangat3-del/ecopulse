@@ -1,7 +1,10 @@
 import { forgotAction } from "@/app/actions/auth";
 import { Flash } from "@/components/ui";
 
-export default function ForgotPasswordPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function ForgotPasswordPage(
+  props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
+) {
+  const searchParams = await props.searchParams;
   return (
     <div className="mx-auto max-w-md">
       <div className="card">

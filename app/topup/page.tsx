@@ -5,7 +5,10 @@ import { Flash } from "@/components/ui";
 import { startTopupAction } from "@/app/actions/wallet";
 import { stripeEnabled } from "@/lib/stripe";
 
-export default async function TopupPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function TopupPage(
+  props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireRole("buyer");
   const txs = await prisma.walletTx.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 20 });
 
