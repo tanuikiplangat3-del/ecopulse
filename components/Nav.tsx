@@ -123,12 +123,16 @@ function NavLink({ item, className }: { item: Item; className?: string }) {
         ? "text-wt-yellow hover:brightness-110"
         : "text-white/85 hover:text-white");
 
-  // Signing out must hit the server route directly, so it stays a plain anchor.
+  // Signing out is a POST to the server route, never a link: a GET that signs
+  // people out can be fired by any other website. A plain form needs no
+  // JavaScript and the button takes the same classes the link had.
   if (item.hard) {
     return (
-      <a href={item.href} className={cls}>
-        {item.label}
-      </a>
+      <form action={item.href} method="post" className={className?.includes("w-full") ? "w-full" : "inline"}>
+        <button type="submit" className={cls}>
+          {item.label}
+        </button>
+      </form>
     );
   }
   return (

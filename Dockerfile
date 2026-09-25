@@ -1,14 +1,16 @@
-# Mirrors ranktomorrow's Dockerfile (node:20-slim, standalone) — app name only differs.
+# Node 24 LTS (security support to April 2028). Node 20 reached end of life
+# on 30 April 2026 and no longer receives security fixes.
 # ---- Dependencies ----
-FROM node:20-slim AS deps
+FROM node:24-slim AS deps
 WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma
-RUN npm install --no-audit --no-fund
+# npm ci installs exactly what package-lock.json records, nothing newer.
+RUN npm ci --no-audit --no-fund
 
 # ---- Build ----
-FROM node:20-slim AS builder
+FROM node:24-slim AS builder
 WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
@@ -19,7 +21,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ---- Runtime ----
-FROM node:20-slim AS runner
+FROM node:24-slim AS runner
 WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production

@@ -35,11 +35,17 @@ async function send(to: string, subject: string, html: string, replyTo?: string)
 }
 
 /** Escape user-supplied text before putting it in an HTML email. */
+export function escHtml(s: string): string {
+  return esc(s);
+}
+
 function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
     .replace(/\n/g, "<br>");
 }
 
@@ -327,7 +333,7 @@ export function sendLiveUrlAdmin(orderId: number, domain: string, liveUrl: strin
     wrap(
       "A link just went live",
       `<p>The publisher submitted the live URL for order <strong>#${orderId}</strong> on <strong>${esc(domain)}</strong>.</p>
-       <p><a href="${liveUrl}" style="color:#0aa865">${esc(liveUrl)}</a></p>
+       <p><a href="${esc(liveUrl)}" style="color:#0aa865">${esc(liveUrl)}</a></p>
        <p>The buyer has been asked to confirm. Once complete, pay the publisher from the admin Orders page.</p>`
     )
   );
@@ -704,6 +710,26 @@ export function sendWithdrawalDecision(input: {
            ${input.note ? `<p><strong>Reason:</strong> ${esc(input.note)}</p>` : ""}
            <p>Your earnings are safe and are available to withdraw again. Sign in, check your
               payment details, and press <strong>Withdraw</strong> on your dashboard.</p>`
+    )
+  );
+}
+
+/**
+ * Someone tried to sign up with an address that already has an account. The
+ * sign-up screen looks exactly like a new sign-up, so the form cannot be used
+ * to test who is registered; the real owner hears about it here instead.
+ */
+export function sendExistingAccountNotice(to: string, loginUrl: string, forgotUrl: string) {
+  return send(
+    to,
+    "You already have a Link Tomorrow account",
+    wrap(
+      "You already have an account",
+      `<p>Someone, probably you, tried to create a Link Tomorrow account with this email address.
+          You already have one.</p>
+       <p><a href="${esc(loginUrl)}">Sign in</a>, or if you have forgotten your password,
+          <a href="${esc(forgotUrl)}">reset it here</a>.</p>
+       <p>If this was not you, you can ignore this email. Nothing has changed on your account.</p>`
     )
   );
 }

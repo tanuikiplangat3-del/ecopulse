@@ -19,6 +19,9 @@ export const PASSWORD_PATTERN =
 /** Returns a human-readable problem, or null when the password is acceptable. */
 export function passwordProblem(password: string): string | null {
   if (password.length < 8) return "Password must be at least 8 characters.";
+  // bcrypt only reads the first 72 bytes. Refusing longer passwords is what
+  // OWASP recommends, rather than silently ignoring the rest.
+  if (Buffer.byteLength(password, "utf8") > 72) return "Password must be 72 characters or fewer.";
   if (!/[A-Z]/.test(password)) return "Password must include at least one capital letter.";
   if (!/[a-z]/.test(password)) return "Password must include at least one small letter.";
   if (!/[0-9]/.test(password)) return "Password must include at least one number.";

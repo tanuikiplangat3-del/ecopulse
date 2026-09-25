@@ -65,6 +65,9 @@ model User {
   // Invoice instead of stored details: this publisher sends an invoice with
   // every live URL rather than being paid to details held on file.
   payInvoiceMode Boolean  @default(false)
+  // Every session token carries this number. Bumping it ends every session
+  // the user has, on every device: sign-out and password reset both do.
+  sessionVersion Int      @default(0)
   createdAt      DateTime @default(now())
 
   listings  Listing[]
@@ -337,4 +340,31 @@ model PublisherApplication {
   createdAt DateTime @default(now())
 
   @@index([status])
+}
+
+// Attempt counters for sign-in, codes, resets, sign-ups and the public forms.
+// One row per key ("login:email:someone@x.com", "login:ip:1.2.3.4"), reset when
+// its window runs out. See lib/rate-limit.ts.
+model RateLimit {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
+// Who did what in the admin area. Written for every action that moves money,
+// changes who can do what, or deletes something. Never updated or deleted by
+// the app. See lib/audit.ts.
+model AdminAudit {
+  id         Int      @id @default(autoincrement())
+  adminId    Int
+  adminEmail String
+  action     String
+  target     String?
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([adminId])
 }

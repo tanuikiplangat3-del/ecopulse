@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hrefOrNone } from "@/lib/safe-url";
 import { money, buyerPrice, trafficShort } from "@/lib/money";
 import { linkTypeLabel } from "@/lib/data";
 import { authorityFor } from "@/lib/authority";
@@ -35,7 +36,7 @@ export default function ListingCard({
   requesterRate?: boolean;
 }) {
   const niches = listing.category.split(",").filter(Boolean).slice(0, 3);
-  const siteUrl = listing.url || `https://${listing.domain}`;
+  const siteUrl = hrefOrNone(listing.url) || hrefOrNone(`https://${listing.domain}`);
 
   // Locked cards are already redacted server-side (see lib/access.ts); the blur
   // is only what the viewer sees. Nothing here is a link, so the card is inert.

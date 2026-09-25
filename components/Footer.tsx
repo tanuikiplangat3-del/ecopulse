@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type React from "react";
 
 const SITE = "https://welcometomorrow.io";
 const LOGO = "https://welcometomorrow.io/wp-content/uploads/2025/07/WT-logo-white.svg";
@@ -21,7 +22,7 @@ const EXPERTISE = [
 ];
 
 const DARK = "#0b0f0d";
-const SOCIALS: { label: string; href: string; icon: JSX.Element }[] = [
+const SOCIALS: { label: string; href: string; icon: React.JSX.Element }[] = [
   {
     label: "Instagram",
     href: "https://www.instagram.com/welcome_tomorrow/",
