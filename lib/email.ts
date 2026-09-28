@@ -10,6 +10,33 @@ export const ADMIN_NOTIFY = process.env.ADMIN_NOTIFY_EMAIL || "seo@welcometomorr
 
 export const emailEnabled = (): boolean => !!resend;
 
+/**
+ * Plain-text copy of an HTML email. Gmail scores HTML-only mail as more likely
+ * to be bulk/spam, so every message goes out with both parts.
+ */
+function htmlToText(html: string): string {
+  return html
+    .replace(/\s+/g, " ")
+    .replace(/<a\s[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, label) => {
+      const l = label.replace(/<[^>]+>/g, "").trim();
+      return l && l !== href ? `${l}: ${href}` : href;
+    })
+    .replace(/<img[^>]*>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|h1|h2|div)>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 async function send(to: string, subject: string, html: string, replyTo?: string): Promise<boolean> {
   if (!resend) {
     console.error(`[email] RESEND_API_KEY is not set - "${subject}" to ${to} was not sent.`);
@@ -19,7 +46,16 @@ async function send(to: string, subject: string, html: string, replyTo?: string)
     // The Resend SDK does NOT throw when the API rejects a message; it returns
     // { data, error }. Checking only for thrown exceptions reported every
     // rejection as a success, which is why failures were invisible.
-    const res: any = await resend.emails.send({ from, to, subject, html, replyTo });
+    // Every mail gets a real Reply-To (the desk inbox) and a plain-text part:
+    // both are trust signals Gmail uses when deciding inbox vs spam.
+    const res: any = await resend.emails.send({
+      from,
+      to,
+      subject,
+      html,
+      text: htmlToText(html),
+      replyTo: replyTo || ADMIN_NOTIFY,
+    });
     if (res?.error) {
       console.error(
         `[email] REJECTED "${subject}" to ${to} from "${from}": ${res.error.name || ""} ${res.error.message || JSON.stringify(res.error)}`
@@ -79,18 +115,28 @@ const wrap = (title: string, body: string) => `
          style="display:block;border:0;outline:none;text-decoration:none;border-radius:12px;margin:0 0 20px" />
     <h1 style="color:#0aa865;margin:0 0 16px">${title}</h1>
     <div style="font-size:16px;line-height:1.5;color:#fff">${body}</div>
-    <p style="color:rgba(255,255,255,.6);font-size:13px;margin-top:24px">Link Tomorrow - Link Building Marketplace</p>
+    <p style="color:rgba(255,255,255,.6);font-size:13px;line-height:1.5;margin-top:24px">Link Tomorrow is run by Welcome Tomorrow, a marketing agency.<br>Questions? Just reply to this email and our team will answer.</p>
   </div>`;
 
 export function sendInviteEmail(to: string, link: string) {
+  // Written as a personal note, not a promo: no "marketplace" pitch, no
+  // urgency, the link shown in full as well as on the button. Publishers get a
+  // lot of automated link-building mail, and Gmail had learned to file ours
+  // with it.
   return send(
     to,
-    "You've been invited to publish on Link Tomorrow",
+    "Your publisher account on Link Tomorrow",
     wrap(
-      "You're invited to become a publisher",
-      `<p>You've been invited to list your websites on the Link Tomorrow link-building marketplace.</p>
-       <p><a href="${link}" style="display:inline-block;background:#0aa865;color:#fff;padding:14px 28px;border-radius:30px;text-decoration:none;font-weight:700">Accept your invite</a></p>
-       <p style="color:rgba(255,255,255,.6)">This link expires in 7 days.</p>`
+      "Your publisher account is ready to set up",
+      `<p>Hello,</p>
+       <p>The Welcome Tomorrow team has set up a publisher account for you on Link Tomorrow, where
+          we order guest posts and sponsored articles from website owners. Once your account is set
+          up you can list your websites, set your own prices, and get paid for each article you
+          publish.</p>
+       <p><a href="${link}" style="display:inline-block;background:#0aa865;color:#fff;padding:14px 28px;border-radius:30px;text-decoration:none;font-weight:700">Set up my account</a></p>
+       <p style="color:rgba(255,255,255,.6);font-size:14px">Or paste this address into your browser:<br>
+          <a href="${link}" style="color:#0aa865;word-break:break-all">${link}</a></p>
+       <p style="color:rgba(255,255,255,.6);font-size:14px">The link works for 7 days. If you were not expecting this, you can ignore it.</p>`
     )
   );
 }
