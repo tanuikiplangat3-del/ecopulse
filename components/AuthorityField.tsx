@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AUTHORITY_DA, AUTHORITY_DR } from "@/lib/authority";
 
 /**
- * Lets a publisher choose which authority number their site displays.
+ * Lets a publisher add a Moz DA next to the Ahrefs DR buyers always see.
  *
  * DR needs no typing at all - we read it from Ahrefs the moment the site is
  * added. DA does, because we are not connected to Moz and cannot look it up, so
@@ -25,7 +25,7 @@ export default function AuthorityField({
 
   return (
     <div className="field mt-4">
-      <span>Which authority score should buyers see?</span>
+      <span>Authority scores buyers see</span>
 
       <div className="mt-2 space-y-3">
         <label className="flex items-start gap-3 text-sm text-white/80">
@@ -38,8 +38,8 @@ export default function AuthorityField({
             className="mt-1"
           />
           <span>
-            <strong className="text-white">Domain Rating (DR)</strong>. We look this up from
-            Ahrefs for you. Nothing to type.
+            <strong className="text-white">DR only</strong>. We look up your Domain Rating
+            from Ahrefs for you. Nothing to type.
           </span>
         </label>
 
@@ -53,8 +53,8 @@ export default function AuthorityField({
             className="mt-1"
           />
           <span>
-            <strong className="text-white">Domain Authority (DA)</strong>. Enter it yourself.
-            Choose this if your site scores better on DA than on DR.
+            <strong className="text-white">DR and Domain Authority (DA)</strong>. Buyers see
+            both. Enter your Moz DA yourself.
           </span>
         </label>
 
@@ -72,8 +72,8 @@ export default function AuthorityField({
               required
             />
             <p className="muted mt-2 text-xs">
-              A number between 1 and 100. Buyers will see this instead of DR, so please make
-              sure it is accurate. Our team checks it against the site.
+              A number between 1 and 100. Buyers see it next to your DR, so please make sure
+              it is accurate. Our team checks it against the site.
             </p>
           </div>
         )}

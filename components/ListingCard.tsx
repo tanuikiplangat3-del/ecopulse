@@ -2,7 +2,7 @@ import Link from "next/link";
 import { hrefOrNone } from "@/lib/safe-url";
 import { money, buyerPrice, trafficShort } from "@/lib/money";
 import { linkTypeLabel } from "@/lib/data";
-import { authorityFor } from "@/lib/authority";
+import { authorityPair, daText } from "@/lib/authority";
 
 type L = {
   id: number;
@@ -53,6 +53,7 @@ export default function ListingCard({
           </div>
           <div className="mt-4 flex gap-4 text-sm">
             <div><p className="muted text-xs">DR</p><p className="font-semibold">00</p></div>
+            <div><p className="muted text-xs">DA</p><p className="font-semibold">00</p></div>
             <div><p className="muted text-xs">Traffic</p><p className="font-semibold">00K</p></div>
             <div><p className="muted text-xs">Type</p><p className="font-semibold">Guest Post</p></div>
           </div>
@@ -113,10 +114,14 @@ export default function ListingCard({
       </div>
 
       <div className="mt-4 flex gap-4 text-sm">
+        {/* Both scores: DR from Ahrefs, DA from the publisher ("-" if none). */}
         <div>
-          {/* DR or DA, whichever this publisher chose to display. */}
-          <p className="muted text-xs">{authorityFor(listing).label}</p>
-          <p className="font-semibold">{authorityFor(listing).value}</p>
+          <p className="muted text-xs">DR</p>
+          <p className="font-semibold">{authorityPair(listing).dr}</p>
+        </div>
+        <div>
+          <p className="muted text-xs">DA</p>
+          <p className="font-semibold">{daText(listing)}</p>
         </div>
         <div>
           <p className="muted text-xs">Traffic</p>

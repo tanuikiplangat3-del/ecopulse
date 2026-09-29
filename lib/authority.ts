@@ -1,12 +1,12 @@
 /**
- * Site authority: DR or DA, one per site.
+ * Site authority: DR always, plus DA when the publisher has given one.
  *
  * Why this exists
  * ---------------
  * Ahrefs Domain Rating is fetched automatically for every site we list. But a
  * real site can score badly on DR and well on Moz Domain Authority - the two
  * metrics measure different things - and we are deliberately NOT connected to
- * Moz. So a publisher may choose to display DA instead, and type the number in
+ * Moz. So a publisher may add their DA as well, and type the number in
  * themselves.
  *
  * That makes DA a *claim*, not a measurement. Two consequences run through this
@@ -19,8 +19,14 @@
  *   2. Changing the claim after approval sends the site back to review. A
  *      number nobody can verify must not be editable silently once live.
  *
- * This module is the ONLY place that decides which number a site displays.
+ * This module is the ONLY place that decides which numbers a site displays.
  * Everything else - marketplace, home page, admin, cards - asks it.
+ *
+ * Changed 29 Sep 2026 (Cosmas): buyers now see BOTH numbers. DR is always
+ * shown; DA is shown next to it when the publisher entered one, and as "-"
+ * when they did not (option A). authorityScore, which the "Min authority"
+ * filter and the home page use, is the HIGHER of the two, so a site qualifies
+ * on either number.
  */
 
 export const AUTHORITY_DR = "dr";
@@ -60,10 +66,27 @@ export function authorityFor(listing: AuthorityFields): { label: "DR" | "DA"; va
   return { label: "DR", value: dr };
 }
 
-/** The value written to Listing.authorityScore. Always derive it from here so
- *  the denormalised column cannot drift from what is on screen. */
+/**
+ * Both numbers, as buyers see them. `da` is null when the publisher has not
+ * given a DA (or gave 0), and the UI shows "-" for it.
+ */
+export function authorityPair(listing: AuthorityFields): { dr: number; da: number | null } {
+  const dr = clamp(listing.domainRating);
+  const da = clamp(listing.domainAuthority);
+  return { dr, da: authorityType(listing.authorityType) === AUTHORITY_DA && da > 0 ? da : null };
+}
+
+/** How a DA reads on screen: the number, or "-" when there is none. */
+export function daText(listing: AuthorityFields): string {
+  const { da } = authorityPair(listing);
+  return da === null ? "-" : String(da);
+}
+
+/** The value written to Listing.authorityScore: the higher of DR and DA.
+ *  Always derive it from here so the column cannot drift from the rule. */
 export function authorityScoreFor(listing: AuthorityFields): number {
-  return authorityFor(listing).value;
+  const { dr, da } = authorityPair(listing);
+  return Math.max(dr, da ?? 0);
 }
 
 /** True when this site displays a publisher-supplied DA rather than Ahrefs DR.

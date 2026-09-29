@@ -85,8 +85,8 @@ export async function refreshDueMetrics(opts: {
       }
       // Refresh the real Ahrefs DR for every site, including ones that display
       // a publisher-supplied DA - admins need the true number to sanity-check
-      // the claim. authorityScore then follows whichever number is on display:
-      // it moves with DR on a DR site and stays put on a DA site.
+      // the claim. authorityScore is then recomputed as the higher of the new
+      // DR and the site's DA (lib/authority.ts).
       // monthlyTraffic is deliberately absent from this update: the publisher
       // owns that number now.
       await prisma.listing.update({
