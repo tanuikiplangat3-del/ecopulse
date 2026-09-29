@@ -32,10 +32,10 @@ export default async function MarketplacePage(
   const country = one(searchParams.country);
   const niche = one(searchParams.niche);
   const language = one(searchParams.language);
-  // Minimum authority. One filter for both metrics: a site is matched on the
-  // number it actually displays, so DR 50 and DA 50 sites appear together.
-  // authorityScore holds that number and is indexed, which is why this is a
-  // plain gte rather than an OR across two columns.
+  // Minimum authority. One filter for both metrics: a site qualifies on either
+  // its DR or its DA. authorityScore holds the higher of the two (see
+  // lib/authority.ts) and is indexed, which is why this is a plain gte rather
+  // than an OR across two columns.
   const minAuthority = parseInt(one(searchParams.authority) || "");
   const min = parseFloat(one(searchParams.min));
   const max = parseFloat(one(searchParams.max));
@@ -137,7 +137,7 @@ export default async function MarketplacePage(
             <SearchSelect name="niche" options={NICHES} defaultValue={niche} title="Filter by niche" />
           </div>
           <label className="field mb-0">
-            <span>Min authority</span>
+            <span>Min DR or DA</span>
             <select className="select" name="authority" defaultValue={one(searchParams.authority)}>
               <option value="">Any</option>
               <option value="20">20+</option>

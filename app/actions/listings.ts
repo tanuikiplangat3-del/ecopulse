@@ -349,7 +349,7 @@ export async function bulkUploadAction(formData: FormData) {
     (missingCountry ? ` ${missingCountry} row(s) had no country column filled in and were set to Kenya.` : "") +
     (rows.length > MAX_ROWS ? ` Only the first ${MAX_ROWS} rows were read.` : "") +
     (daRows
-      ? ` ${daRows} site(s) had a Domain Authority in the DA column and will display DA instead of DR.`
+      ? ` ${daRows} site(s) had a Domain Authority in the DA column and will show DA next to DR.`
       : "") +
     (missingTraffic
       ? ` ${missingTraffic} row(s) had no readable monthly traffic and were listed at 0 - traffic is no longer fetched automatically, so add it on Websites (a live site goes back to our team for a quick check when you change it).`
@@ -478,7 +478,7 @@ export async function changeAuthorityAction(formData: FormData) {
   if (!listing) redirect(`/my-listings?error=${q("That website was not found.")}`);
 
   if (chosen === AUTHORITY_DA && daValue === null) {
-    redirect(`/my-listings?error=${q("Enter a Domain Authority between 1 and 100, or choose Domain Rating.")}`);
+    redirect(`/my-listings?error=${q("Enter a Domain Authority between 1 and 100, or choose DR only.")}`);
   }
 
   const next = {
@@ -511,8 +511,8 @@ export async function changeAuthorityAction(formData: FormData) {
   redirect(
     `/my-listings?success=${q(
       chosen === AUTHORITY_DA
-        ? `Updated. ${listing!.domain} will show DA ${next.domainAuthority} once our team has checked it.`
-        : `Updated. ${listing!.domain} will show its Ahrefs Domain Rating once our team has checked it.`
+        ? `Updated. ${listing!.domain} will show DA ${next.domainAuthority} next to its DR once our team has checked it.`
+        : `Updated. ${listing!.domain} will show its Ahrefs Domain Rating only, once our team has checked it.`
     )}`
   );
 }

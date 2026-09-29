@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { money, trafficShort } from "@/lib/money";
 import { StatusBadge, Flash, EmptyState } from "@/components/ui";
 import { deleteListingAction, changeAuthorityAction, changeTrafficAction } from "@/app/actions/listings";
-import { authorityFor } from "@/lib/authority";
+import { authorityFor, authorityPair, daText } from "@/lib/authority";
 
 export default async function MyListingsPage(
   props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }
@@ -43,8 +43,10 @@ export default async function MyListingsPage(
                     <div className="muted text-xs">{l.country}</div>
                   </td>
                   <td>
-                    <span className="muted mr-1 text-xs">{authorityFor(l).label}</span>
-                    {authorityFor(l).value}
+                    <span className="muted mr-1 text-xs">DR</span>
+                    {authorityPair(l).dr}
+                    <span className="muted ml-3 mr-1 text-xs">DA</span>
+                    {daText(l)}
                   </td>
                   <td>{trafficShort(l.monthlyTraffic)}</td>
                   <td>{money(l.priceCents)}</td>
@@ -56,7 +58,7 @@ export default async function MyListingsPage(
                           actually wants to change the number. */}
                       <details className="w-full">
                         <summary className="btn-ghost btn-sm cursor-pointer list-none">
-                          Change {authorityFor(l).label}
+                          Change DA
                         </summary>
                         <form action={changeAuthorityAction} className="mt-2 space-y-2">
                           <input type="hidden" name="id" value={l.id} />
@@ -65,8 +67,8 @@ export default async function MyListingsPage(
                             name="authorityType"
                             defaultValue={authorityFor(l).label === "DA" ? "da" : "dr"}
                           >
-                            <option value="dr">Show Domain Rating (from Ahrefs)</option>
-                            <option value="da">Show Domain Authority (enter it)</option>
+                            <option value="dr">DR only (from Ahrefs)</option>
+                            <option value="da">DR and DA (enter your DA)</option>
                           </select>
                           <input
                             className="input"

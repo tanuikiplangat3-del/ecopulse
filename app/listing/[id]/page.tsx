@@ -9,7 +9,7 @@ import { linkTypeLabel, CONTENT_TYPES } from "@/lib/data";
 import { hasRequesterRate } from "@/lib/requester";
 import { placeOrderAction } from "@/app/actions/orders";
 import { Flash } from "@/components/ui";
-import { authorityFor } from "@/lib/authority";
+import { authorityPair, daText } from "@/lib/authority";
 
 export default async function ListingPage(
   props: {
@@ -67,12 +67,14 @@ export default async function ListingPage(
         </h1>
         <p className="muted mb-5">{listing.country} · {listing.language}</p>
 
-        <div className="card mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="card mb-5 grid grid-cols-2 gap-4 sm:grid-cols-5">
           <div>
-            <p className="muted text-xs">
-              {authorityFor(listing).label === "DA" ? "Domain Authority" : "Domain Rating"}
-            </p>
-            <p className="text-xl font-bold">{authorityFor(listing).value}</p>
+            <p className="muted text-xs">Domain Rating (DR)</p>
+            <p className="text-xl font-bold">{authorityPair(listing).dr}</p>
+          </div>
+          <div>
+            <p className="muted text-xs">Domain Authority (DA)</p>
+            <p className="text-xl font-bold">{daText(listing)}</p>
           </div>
           <div><p className="muted text-xs">Monthly Traffic</p><p className="text-xl font-bold">{trafficShort(listing.monthlyTraffic)}</p></div>
           <div><p className="muted text-xs">Turnaround</p><p className="text-xl font-bold">{listing.tatDays}d</p></div>
